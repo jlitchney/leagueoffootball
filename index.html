@@ -19,7 +19,7 @@
 :root{
   color-scheme: light;
   --bg:#EEF1F5; --surface:#FFFFFF; --line:#DDE2EA; --ink:#121826; --muted:#5B6475;
-  --me:#C2410C; --opp:#1D4ED8; --turf-soft:#E6EAF0; --tick:rgba(18,24,38,.12); --bad:#B91C1C; --live:#15803D;
+  --me:#C2410C; --opp:#1D4ED8; --turf-soft:#E6EAF0; --tick:rgba(18,24,38,.12); --bad:#B91C1C; --live:#15803D; --accent:#4F46E5;
   --display:"Saira Extra Condensed","Arial Narrow",system-ui,sans-serif;
   --body:"Saira Semi Condensed",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   box-sizing:border-box;
@@ -44,7 +44,7 @@ button{cursor:pointer}
 
 .matchup-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
 .mm-btn{padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font:600 14px/1.2 var(--body);white-space:nowrap;flex-shrink:0;transition:background .15s,border-color .15s,color .15s}
-.mm-btn.active{background:var(--me);color:#fff;border-color:var(--me)}
+.mm-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .mm-pick{flex:1;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);min-width:0;font:inherit;color:inherit}
 
 /* scoreboard header */
@@ -142,7 +142,7 @@ button{cursor:pointer}
 @media (prefers-reduced-motion: reduce){}
 .tabs{display:flex;border-bottom:1px solid var(--line);margin-bottom:14px}
 .tab{flex:1;padding:10px 4px 9px;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;font:600 13px/1.2 var(--body);color:var(--muted)}
-.tab.active{color:var(--me);border-bottom-color:var(--me)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .bowner{font-size:11px;color:var(--muted);margin-top:1px}
 .hs-race{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:10px}
 .hs-title{font:700 12px/1 var(--body);text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
@@ -587,14 +587,28 @@ function rowScores(a, b) {
   const sc = r => r ? `<div class="sc">${splitPts(r.pts)}</div><div class="sp">${proj(r) || '&nbsp;'}</div>` : '';
   return `<div class="rscores"><div class="rscore ${cls(a||{},b)}">${sc(a)}</div><div class="rsep"></div><div class="rscore ${b ? cls(b,a) : ''}">${sc(b)}</div></div>`;
 }
+function winColor(winPct, isWinner) {
+  if (winPct == null) return null;
+  const conf = Math.abs(winPct - 0.5) * 2;
+  const N = [75, 85, 99];
+  const W = [21, 128, 61];
+  const L = [185, 28, 28];
+  const target = isWinner ? W : L;
+  const r = Math.round(N[0] + (target[0] - N[0]) * conf);
+  const g = Math.round(N[1] + (target[1] - N[1]) * conf);
+  const b = Math.round(N[2] + (target[2] - N[2]) * conf);
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
 function teamBlock(t, side, winPct) {
   const cls = side;
   const pct = t.minTotal ? (t.minLeft / t.minTotal) * 100 : 0;
   const minsLabel = S.games ? `${Math.round(t.minLeft)} min left` : '';
   const winning = winPct != null && winPct > 0.5;
   const pctLabel = winPct != null ? ` <span class="bproj-pct">· ${Math.round(winPct * 100)}%</span>` : '';
+  const scoreCol = winColor(winPct, winning);
+  const scoreStyle = scoreCol ? ' style="color:' + scoreCol + '"' : '';
   return `<div class="bteam${side === 'b' ? ' r' : ''}${winning ? ' proj-win' : ''}">
-    <div class="bsc ${cls}">${splitPts(t.points)}</div>
+    <div class="bsc ${cls}"${scoreStyle}>${splitPts(t.points)}</div>
     <div class="bproj">Proj <b>${fmt(t.live)}</b>${pctLabel}</div>
     <div class="bname">${esc(t.name)}</div>
     ${t.owner ? `<div class="bowner">${esc(t.owner)}</div>` : ''}
