@@ -179,6 +179,16 @@ button{cursor:pointer}
 .trade-item{display:flex;align-items:baseline;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.4}
 .trade-wk{flex-shrink:0;color:var(--muted);font-size:11px;font-weight:600;width:28px}
 .trade-sides{color:var(--ink);flex:1;min-width:0}
+.move-cards{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.move-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.move-card-hdr{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.move-card-name{font:700 14px/1 var(--body);color:var(--ink)}
+.move-card-net{font:700 12px/1 var(--body)}
+.move-card-body{padding:8px 14px 10px;display:flex;flex-direction:column;gap:5px}
+.move-line{font-size:12px;color:var(--muted);line-height:1.4}
+.move-line b{color:var(--ink)}
+.move-line.pos{color:var(--live)}
+.move-line.neg{color:var(--bad)}
 .tx-tag{flex-shrink:0;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;letter-spacing:.4px}
 .tx-trade{background:rgba(17,24,39,.08);color:var(--ink)}
 .tx-move{background:rgba(91,100,117,.1);color:var(--muted)}
@@ -252,6 +262,7 @@ button{cursor:pointer}
     <nav class="tabs">
       <button class="tab active" data-tab="score">Scoreboard</button>
       <button class="tab" data-tab="stand">Standings</button>
+      <button class="tab" data-tab="moves">Moves</button>
       <button class="tab" data-tab="money">Money</button>
       <button class="tab" data-tab="champs">Champions</button>
     </nav>
@@ -298,6 +309,9 @@ button{cursor:pointer}
     </div>
     <div id="page-stand" class="page hidden">
       <section id="standings"></section>
+    </div>
+    <div id="page-moves" class="page hidden">
+      <section id="moves"></section>
     </div>
   </section>
 
@@ -1288,7 +1302,7 @@ function renderStandings(){
     '<tbody>' + trs + '</tbody></table>' +
     '<p class="note">HSW = weekly high score wins (' + usd(PAYOUTS.weeklyHigh) + ' prize each). Dashed line = playoff cutoff. ' +
     (remaining > 0 ? remaining + ' week' + (remaining !== 1 ? 's' : '') + ' remaining.' : 'Regular season complete.') + '</p>' +
-    prHtml + luckHtml + resultsGrid(rows) + activityLog();
+    prHtml + luckHtml + resultsGrid(rows);
 }
 async function loadMoney(){
   if (!S.league || !S.nfl) return;
@@ -1374,6 +1388,95 @@ function activityLog() {
   ).join('');
   return `<div class="trade-log"><div class="chart-title" style="margin-bottom:8px">Transactions</div>${items}</div>`;
 }
+function buildPlayerMaps() {
+  const byRoster = {}, byPts = {};
+  for (let w = 1; w <= M.done; w++) {
+    for (const m of M.weeks[w] || []) {
+      for (const pid of m.players || []) (byRoster[pid] ||= {})[w] = m.roster_id;
+      for (const [pid, pts] of Object.entries(m.players_points || {})) (byPts[pid] ||= {})[w] = pts;
+    }
+  }
+  return { byRoster, byPts };
+}
+function transactionStats() {
+  if (!M.done) return {};
+  const { byRoster, byPts } = buildPlayerMaps();
+  const currentRoster = {};
+  for (const r of S.rosters) for (const pid of r.players || []) currentRoster[pid] = r.roster_id;
+  const stats = {};
+  for (const r of S.rosters) stats[r.roster_id] = { adds: [], drops: [], tradePts: 0 };
+
+  for (let w = 1; w <= M.done; w++) {
+    for (const x of M.trades_by_week[w] || []) {
+      if (x.status !== 'complete') continue;
+      if (x.type === 'waiver' || x.type === 'free_agent') {
+        for (const [pid, rid] of Object.entries(x.adds || {})) {
+          const s = stats[+rid]; if (!s) continue;
+          let pts = 0;
+          for (let ww = w; ww <= M.done; ww++) if (byRoster[pid]?.[ww] === +rid) pts += byPts[pid]?.[ww] || 0;
+          s.adds.push({ pid, name: S.players[pid]?.[0] || 'Unknown', week: w, pts, stillHave: currentRoster[pid] === +rid, type: x.type });
+        }
+        for (const [pid, rid] of Object.entries(x.drops || {})) {
+          const s = stats[+rid]; if (!s) continue;
+          let ptsMissed = 0;
+          for (let ww = w + 1; ww <= M.done; ww++) ptsMissed += byPts[pid]?.[ww] || 0;
+          if (ptsMissed > 0) s.drops.push({ pid, name: S.players[pid]?.[0] || 'Unknown', week: w, ptsMissed });
+        }
+      }
+      if (x.type === 'trade') {
+        const got = {};
+        for (const [pid, rid] of Object.entries(x.adds || {})) (got[+rid] ||= []).push(pid);
+        for (const rid of x.roster_ids || []) {
+          const s = stats[+rid]; if (!s) continue;
+          let pts = 0;
+          for (const pid of got[+rid] || []) {
+            for (let ww = w; ww <= M.done; ww++) if (byRoster[pid]?.[ww] === +rid) pts += byPts[pid]?.[ww] || 0;
+          }
+          s.tradePts += pts;
+        }
+      }
+    }
+  }
+  return stats;
+}
+function renderMoves() {
+  const el = $('moves'); if (!el) return;
+  if (!M.done) { el.innerHTML = '<p class="sub" style="margin-top:16px">No transactions yet this season.</p>'; return; }
+  const stats = transactionStats();
+  const sorted = S.rosters.slice().sort((a, b) => (b.settings?.wins || 0) - (a.settings?.wins || 0));
+
+  const cards = sorted.map(r => {
+    const rid = r.roster_id;
+    const s = stats[rid]; if (!s) return '';
+    const name = ownerName(rid) || teamName(rid).split(' ')[0];
+    const bestAdd = s.adds.slice().sort((a, b) => b.pts - a.pts)[0];
+    const worstDrop = s.drops.slice().sort((a, b) => b.ptsMissed - a.ptsMissed)[0];
+    const addPts = s.adds.reduce((a, x) => a + x.pts, 0);
+    const dropPts = s.drops.reduce((a, x) => a + x.ptsMissed, 0);
+    const net = addPts - dropPts;
+    const netCls = net >= 10 ? 'lk-pos' : net <= -10 ? 'lk-neg' : '';
+    const netStr = (net >= 0 ? '+' : '') + fmt(net) + ' pts from moves';
+    const lines = [];
+    if (bestAdd && bestAdd.pts >= 5) {
+      const sh = bestAdd.stillHave ? 'still rostered' : 'since dropped';
+      lines.push(`<div class="move-line pos">Best add: <b>${esc(bestAdd.name)}</b> — ${fmt(bestAdd.pts)} pts (${sh})</div>`);
+    } else {
+      lines.push('<div class="move-line">No impactful adds yet.</div>');
+    }
+    if (worstDrop && worstDrop.ptsMissed >= 10) {
+      lines.push(`<div class="move-line neg">Worst drop: <b>${esc(worstDrop.name)}</b> scored ${fmt(worstDrop.ptsMissed)} pts elsewhere after Wk ${worstDrop.week}</div>`);
+    }
+    if (s.tradePts > 0) {
+      lines.push(`<div class="move-line">Trade haul: <b>${fmt(s.tradePts)} pts</b> from received players</div>`);
+    }
+    return '<div class="move-card"><div class="move-card-hdr"><span class="move-card-name">' + esc(name) +
+      '</span><span class="move-card-net ' + netCls + '">' + netStr + '</span></div>' +
+      '<div class="move-card-body">' + lines.join('') + '</div></div>';
+  }).join('');
+
+  el.innerHTML = '<h2>Moves</h2><p class="note" style="margin-bottom:16px">Grades based on pts scored by pickups and pts given away by drops since each transaction.</p>' +
+    '<div class="move-cards">' + cards + '</div>' + activityLog();
+}
 function renderMoney(){
   if (M.season == null) return;
   const won = {};
@@ -1419,6 +1522,7 @@ function renderMoney(){
     ${rows ? `<ul class="titles">${rows}</ul>` : '<p class="sub">No weekly prizes paid yet.</p>'}`;
   $('money').classList.remove('hidden');
   renderStandings();
+  renderMoves();
 }
 
 $('enableAlerts').onclick = enableAlerts;
