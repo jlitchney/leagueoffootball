@@ -520,7 +520,7 @@ function render(){
   }
 
   const n = Math.max(A.rows.length, B ? B.rows.length : 0);
-  let rows = ‘’;
+  let rows = '';
   for (let i = 0; i < n; i++) {
     const a = A.rows[i], b = B?.rows[i];
     rows += `<div class="row">${playerSide(a, false)}${rowScores(a, b)}${playerSide(b, true)}</div>`;
@@ -528,17 +528,17 @@ function render(){
 
   const minsLeft = S.games
     ? `${Math.round(A.minLeft)} · ${B ? Math.round(B.minLeft) : 0} min left`
-    : ‘’;
-  $(‘main’).innerHTML = `
+    : '';
+  $('main').innerHTML = `
     <section class="board">
-      ${teamBlock(A, ‘a’)}
-      <div class="bvs">VS${minsLeft ? `<div class="bmins">${minsLeft}</div>` : ‘’}</div>
-      ${B ? teamBlock(B, ‘b’) : ‘<div class="bteam r"><div class="bname">Bye</div></div>’}
+      ${teamBlock(A, 'a')}
+      <div class="bvs">VS${minsLeft ? `<div class="bmins">${minsLeft}</div>` : ''}</div>
+      ${B ? teamBlock(B, 'b') : '<div class="bteam r"><div class="bname">Bye</div></div>'}
     </section>
-    ${verdict ? `<div class="verdict">${verdict}</div>` : ‘’}
+    ${verdict ? `<div class="verdict">${verdict}</div>` : ''}
     <div class="rows">${rows}</div>
-    ${S.proj ? ‘’ : ‘<div class="msg">Projections didn’t load, so projected totals show points scored only.</div>’}
-    ${S.games ? ‘’ : ‘<div class="msg">Game clocks didn’t load from ESPN, so minutes left aren’t shown. It will retry.</div>’}`;
+    ${S.proj ? '' : '<div class="msg">Projections didn’t load, so projected totals show points scored only.</div>'}
+    ${S.games ? '' : '<div class="msg">Game clocks didn’t load from ESPN, so minutes left aren’t shown. It will retry.</div>'}`;
   updateStatus();
   renderMoney();
 }
@@ -604,7 +604,7 @@ function renderHall(){
     o.best = Math.max(o.best, o.run); o.last = c.year; o.years.push(c.year);
   }
   const owners = Object.values(by).sort((a, b) => b.years.length - a.years.length || Math.max(...b.years) - Math.max(...a.years));
-  const yrs = o => o.years.map(y => "’" + String(y).slice(2)).join(', ');
+  const yrs = o => o.years.map(y => "'" + String(y).slice(2)).join(', ');
   $('hall').innerHTML = `
     <h2>Champions</h2>
     <p class="sub">Reigning: <b>${esc(champ.owner)}</b>, ${esc(champ.team)} (${champ.year})</p>
@@ -760,7 +760,7 @@ function renderMoney(){
     const top = Math.max(...S.matchups.map(m => m.points || 0));
     if (top > 0) {
       const leaders = S.matchups.filter(m => (m.points || 0) === top).map(m => esc(teamName(m.roster_id))).join(' and ');
-      pace = `<p class="sub">Week ${S.week}’s ${usd(PAYOUTS.weeklyHigh)}: <b>${leaders}</b> leads with ${fmt(top)}</p>`;
+      pace = `<p class="sub">Week ${S.week}'s ${usd(PAYOUTS.weeklyHigh)}: <b>${leaders}</b> leads with ${fmt(top)}</p>`;
     }
   }
   const rows = Object.entries(won).sort((a, b) => b[1].amt - a[1].amt).map(([rid, o]) => {
