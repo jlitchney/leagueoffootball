@@ -918,11 +918,11 @@ function winProbsMC(teams){
 function renderHighScoreRace(){
   const el = $('hs-race');
   if (!el) return;
-  const thisWeek = !M.pastSeason && S.nfl && S.week === (S.nfl.week || 0) && S.week <= M.lastWeek;
-  if (!thisWeek || !S.matchups?.length) { el.innerHTML = ''; return; }
+  if (M.pastSeason || !S.nfl || S.week < 1 || S.week > M.lastWeek || !S.matchups?.length) { el.innerHTML = ''; return; }
+  const isLive = S.week === (S.nfl.week || 0);
   const teams = S.matchups.map(m => {
     let scored = m.points || 0, live = scored, remaining = 0, active = 0, minLeft = 0;
-    if (S.proj && S.games) {
+    if (isLive && S.proj && S.games) {
       live = 0;
       for (let i = 0; i < (m.starters || []).length; i++) {
         const pid = m.starters[i];
