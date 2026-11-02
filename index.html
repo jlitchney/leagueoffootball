@@ -1443,19 +1443,22 @@ function renderMoves() {
   const el = $('moves'); if (!el) return;
   if (!M.done) { el.innerHTML = '<p class="sub" style="margin-top:16px">No transactions yet this season.</p>'; return; }
   const stats = transactionStats();
-  const sorted = S.rosters.slice().sort((a, b) => (b.settings?.wins || 0) - (a.settings?.wins || 0));
 
-  const cards = sorted.map(r => {
+  // Rank by net pts: adds earned - drops missed + trade haul
+  const ranked = S.rosters.map(r => {
+    const s = stats[r.roster_id] || { adds: [], drops: [], tradePts: 0 };
+    const addPts = s.adds.reduce((a, x) => a + x.pts, 0);
+    const dropPts = s.drops.reduce((a, x) => a + x.ptsMissed, 0);
+    return { r, s, net: addPts - dropPts + s.tradePts, addPts, dropPts };
+  }).sort((a, b) => b.net - a.net);
+
+  const cards = ranked.map(({ r, s, net, addPts, dropPts }, i) => {
     const rid = r.roster_id;
-    const s = stats[rid]; if (!s) return '';
     const name = ownerName(rid) || teamName(rid).split(' ')[0];
     const bestAdd = s.adds.slice().sort((a, b) => b.pts - a.pts)[0];
     const worstDrop = s.drops.slice().sort((a, b) => b.ptsMissed - a.ptsMissed)[0];
-    const addPts = s.adds.reduce((a, x) => a + x.pts, 0);
-    const dropPts = s.drops.reduce((a, x) => a + x.ptsMissed, 0);
-    const net = addPts - dropPts;
     const netCls = net >= 10 ? 'lk-pos' : net <= -10 ? 'lk-neg' : '';
-    const netStr = (net >= 0 ? '+' : '') + fmt(net) + ' pts from moves';
+    const netStr = (net >= 0 ? '+' : '') + fmt(net) + ' pts';
     const lines = [];
     if (bestAdd && bestAdd.pts >= 5) {
       const sh = bestAdd.stillHave ? 'still rostered' : 'since dropped';
@@ -1469,12 +1472,13 @@ function renderMoves() {
     if (s.tradePts > 0) {
       lines.push(`<div class="move-line">Trade haul: <b>${fmt(s.tradePts)} pts</b> from received players</div>`);
     }
-    return '<div class="move-card"><div class="move-card-hdr"><span class="move-card-name">' + esc(name) +
-      '</span><span class="move-card-net ' + netCls + '">' + netStr + '</span></div>' +
+    return '<div class="move-card"><div class="move-card-hdr">' +
+      '<span class="move-card-name"><span class="rank" style="margin-right:6px">' + (i + 1) + '</span>' + esc(name) + '</span>' +
+      '<span class="move-card-net ' + netCls + '">' + netStr + '</span></div>' +
       '<div class="move-card-body">' + lines.join('') + '</div></div>';
   }).join('');
 
-  el.innerHTML = '<h2>Moves</h2><p class="note" style="margin-bottom:16px">Grades based on pts scored by pickups and pts given away by drops since each transaction.</p>' +
+  el.innerHTML = '<h2>Moves</h2><p class="note" style="margin-bottom:16px">Ranked by net pts: pickups earned + trade haul minus pts given away by drops.</p>' +
     '<div class="move-cards">' + cards + '</div>' + activityLog();
 }
 function renderMoney(){
