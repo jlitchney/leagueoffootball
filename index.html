@@ -64,7 +64,12 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
 .bname{font:600 14px/1.3 var(--body);margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brec{font-size:12px;color:var(--muted)}
 .bvs{text-align:center;color:var(--muted);font:700 13px/1 var(--body);padding-top:10px;white-space:nowrap}
-.bmins{font-size:11px;color:var(--muted);margin-top:5px;font-weight:400}
+.bbar-wrap{height:3px;background:var(--line);border-radius:2px;margin-top:8px;overflow:hidden}
+.bteam.r .bbar-wrap{direction:rtl}
+.bbar{height:100%;border-radius:2px;transition:width .5s ease}
+.bbar.a{background:var(--me)}
+.bbar.b{background:var(--opp)}
+.bmin-txt{font-size:11px;color:var(--muted);margin-top:3px}
 .verdict{text-align:center;color:var(--muted);font-size:13px;margin:10px 0 4px}
 .verdict b{color:var(--ink)}
 /* player rows */
@@ -479,12 +484,16 @@ function rowScores(a, b) {
   return `<div class="rscores"><div class="rscore ${cls(a||{},b)}">${sc(a)}</div><div class="rsep"></div><div class="rscore ${b ? cls(b,a) : ''}">${sc(b)}</div></div>`;
 }
 function teamBlock(t, side) {
-  const cls = side; // 'a' or 'b'
+  const cls = side;
+  const pct = t.minTotal ? (t.minLeft / t.minTotal) * 100 : 0;
+  const minsLabel = S.games ? `${Math.round(t.minLeft)} min left` : '';
   return `<div class="bteam${side === 'b' ? ' r' : ''}">
     <div class="bsc ${cls}">${splitPts(t.points)}</div>
     <div class="bproj">Proj <b>${fmt(t.live)}</b></div>
     <div class="bname">${esc(t.name)}</div>
     ${t.record ? `<div class="brec">${esc(t.record)}</div>` : ''}
+    <div class="bbar-wrap"><div class="bbar ${cls}" style="width:${pct.toFixed(1)}%"></div></div>
+    ${minsLabel ? `<div class="bmin-txt">${minsLabel}</div>` : ''}
   </div>`;
 }
 function render(){
@@ -526,13 +535,10 @@ function render(){
     rows += `<div class="row">${playerSide(a, false)}${rowScores(a, b)}${playerSide(b, true)}</div>`;
   }
 
-  const minsLeft = S.games
-    ? `${Math.round(A.minLeft)} · ${B ? Math.round(B.minLeft) : 0} min left`
-    : '';
   $('main').innerHTML = `
     <section class="board">
       ${teamBlock(A, 'a')}
-      <div class="bvs">VS${minsLeft ? `<div class="bmins">${minsLeft}</div>` : ''}</div>
+      <div class="bvs">VS</div>
       ${B ? teamBlock(B, 'b') : '<div class="bteam r"><div class="bname">Bye</div></div>'}
     </section>
     ${verdict ? `<div class="verdict">${verdict}</div>` : ''}
