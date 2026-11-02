@@ -296,10 +296,14 @@ const CHAMPIONS = [
 
 /* Payouts. Weekly prize goes to the week's top score; ties split it. */
 const PAYOUTS = { weeklyHigh: 50, first: 170, second: 70, third: 50, weeklyThroughPlayoffs: false };
-// Add an entry here each week after uploading the file to the media/ folder.
-// Files go in media/ and are named however you like, e.g. 'week3.mp4'
+// Add an entry here each week after uploading the file anywhere in the repo.
+// Use the exact filename as uploaded, e.g. '2026-week-2.MOV'
 const WEEKLY_MEDIA = {
-  // 1: 'week1.mp4',
+  1: '2026-week-1.MOV',
+  2: '2026-week-2.MOV',
+  4: '2026-week-4.MOV',
+  5: '2026-week-5.MOV',
+  8: '2026-week-8.MOV',
 };
 
 /* Sleeper username -> real name for all 10 members */
@@ -800,7 +804,7 @@ function openMedia(week) {
   const ov = document.createElement('div');
   ov.className = 'vid-overlay';
   ov.innerHTML = '<p class="vid-caption">' + esc(caption) + '</p>' +
-    '<video src="media/' + esc(src) + '" autoplay loop muted playsinline></video>' +
+    '<video src="' + esc(src) + '" autoplay loop muted playsinline></video>' +
     '<p class="vid-close">Tap anywhere to close</p>';
   ov.onclick = () => ov.remove();
   document.body.appendChild(ov);
