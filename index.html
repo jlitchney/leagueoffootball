@@ -168,6 +168,12 @@ button{cursor:pointer}
 .stand-table tr.out td{opacity:.65}
 .bench-section{margin-top:12px}
 .bench-hdr{display:grid;grid-template-columns:1fr auto 1fr;padding:6px 0;color:var(--muted);font:600 11px/1 var(--body);text-transform:uppercase;letter-spacing:.5px;border-top:2px solid var(--line);text-align:center}
+.bbnch{font-size:11px;color:var(--muted);margin-top:2px}
+.h2h-rec{text-align:center;font-size:12px;color:var(--muted);margin:4px 0 2px}
+.trade-log{margin-top:22px}
+.trade-item{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.4}
+.trade-wk{flex-shrink:0;color:var(--muted);font-size:11px;font-weight:600;width:36px;padding-top:2px}
+.trade-sides{color:var(--ink)}
 /* charts */
 .chart-section{margin:16px 0}
 .chart-title{font:700 11px/1 var(--body);text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px}
@@ -614,15 +620,37 @@ function teamBlock(t, side, winPct) {
   const pctLabel = winPct != null ? ` <span class="bproj-pct" style="color:${winColor(winPct)}">· ${Math.round(winPct * 100)}%</span>` : '';
   const scoreCol = t.points > 0 ? winColor(winPct) : null;
   const scoreStyle = scoreCol ? ' style="color:' + scoreCol + '"' : '';
+  const benchPts = (t.bench || []).reduce((a, r) => a + (r.pts || 0), 0);
   return `<div class="bteam${side === 'b' ? ' r' : ''}${winning ? ' proj-win' : ''}">
     <div class="bsc ${cls}"${scoreStyle}>${splitPts(t.points)}</div>
     <div class="bproj">Proj <b>${fmt(t.live)}</b>${pctLabel}</div>
     <div class="bname">${esc(t.name)}</div>
     ${t.owner ? `<div class="bowner">${esc(t.owner)}</div>` : ''}
     ${t.record ? `<div class="brec">${esc(t.record)}</div>` : ''}
+    ${benchPts > 0.05 ? `<div class="bbnch">Bench: ${fmt(benchPts)}</div>` : ''}
     <div class="bbar-wrap"><div class="bbar ${cls}" style="width:${pct.toFixed(1)}%"></div></div>
     ${minsLabel ? `<div class="bmin-txt">${minsLabel}</div>` : ''}
   </div>`;
+}
+function h2hRecord(ridA, ridB) {
+  if (!M.done || !ridB) return null;
+  let wA = 0, wB = 0;
+  for (let w = 1; w <= M.done; w++) {
+    const wk = M.weeks[w]; if (!wk?.length) continue;
+    const map = {};
+    wk.forEach(m => { (map[m.matchup_id] ||= []).push(m); });
+    for (const pair of Object.values(map)) {
+      if (pair.length !== 2) continue;
+      const rids = pair.map(m => m.roster_id);
+      if (!rids.includes(ridA) || !rids.includes(ridB)) continue;
+      const a = pair.find(m => m.roster_id === ridA);
+      const b = pair.find(m => m.roster_id === ridB);
+      if ((a.points || 0) > (b.points || 0)) wA++;
+      else if ((b.points || 0) > (a.points || 0)) wB++;
+    }
+  }
+  if (wA + wB === 0) return null;
+  return { wA, wB };
 }
 function render(){
   const ps = pairs();
@@ -671,6 +699,7 @@ function render(){
       verdict += `<br>${l[0].toUpperCase() + l.slice(1)} vs ${r}`;
     }
   }
+  const h2h = B ? h2hRecord(pair[0].roster_id, pair[1].roster_id) : null;
 
   const n = Math.max(A.rows.length, B ? B.rows.length : 0);
   let rows = '';
@@ -694,6 +723,7 @@ function render(){
       ${B ? teamBlock(B, 'b', bWinProb) : '<div class="bteam r"><div class="bname">Bye</div></div>'}
     </section>
     ${verdict ? `<div class="verdict">${verdict}</div>` : ''}
+    ${h2h ? `<div class="h2h-rec">${esc(A.name.split(' ')[0])} ${h2h.wA}–${h2h.wB} ${esc(B.name.split(' ')[0])} all time</div>` : ''}
     <div class="rows">${rows}</div>
     ${benchSection}
     ${S.proj ? '' : '<div class="msg">Projections didn’t load, so projected totals show points scored only.</div>'}
@@ -956,7 +986,7 @@ function ago(t){
   return new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
 /* ---------- money ---------- */
-const M = { season: null, weeks: {}, bracket: null, done: 0, lastWeek: 14 };
+const M = { season: null, weeks: {}, trades_by_week: {}, bracket: null, done: 0, lastWeek: 14 };
 const usd = n => '$' + (Number.isInteger(n) ? n : n.toFixed(2));
 function normCdf(z){
   if (z < -6) return 0; if (z > 6) return 1;
@@ -1156,13 +1186,39 @@ async function loadMoney(){
   const lastWeek = PAYOUTS.weeklyThroughPlayoffs ? 17 : ((S.league.settings?.playoff_week_start || 15) - 1);
   const pastSeason = String(S.season) !== String(S.nfl.season);
   const done = pastSeason ? lastWeek : Math.min(lastWeek, S.nfl.season_type === 'pre' ? 0 : (S.nfl.week || 1) - 1);
-  if (M.season !== S.season) { M.season = S.season; M.weeks = {}; }
+  if (M.season !== S.season) { M.season = S.season; M.weeks = {}; M.trades_by_week = {}; }
   const need = [];
   for (let w = 1; w <= done; w++) if (!M.weeks[w]) need.push(w);
   await Promise.all(need.map(async w => { try { M.weeks[w] = await j(`${SL}/league/${S.cfg.leagueId}/matchups/${w}`); } catch {} }));
+  const txNeed = [];
+  for (let w = 1; w <= done; w++) if (!M.trades_by_week[w]) txNeed.push(w);
+  await Promise.all(txNeed.map(async w => { try { M.trades_by_week[w] = await j(`${SL}/league/${S.cfg.leagueId}/transactions/${w}`); } catch { M.trades_by_week[w] = []; } }));
   try { M.bracket = await j(`${SL}/league/${S.cfg.leagueId}/winners_bracket`); } catch { M.bracket = null; }
   M.done = done; M.lastWeek = lastWeek; M.pastSeason = pastSeason;
   renderMoney();
+}
+function tradeLog() {
+  if (!M.done) return '';
+  const trades = [];
+  for (let w = 1; w <= M.done; w++) {
+    const txs = M.trades_by_week[w] || [];
+    for (const x of txs) {
+      if (x.type !== 'trade' || x.status !== 'complete') continue;
+      const got = {};
+      for (const [pid, rid] of Object.entries(x.adds || {})) (got[rid] ||= []).push(S.players[pid]?.[0] || pid);
+      for (const pk of x.draft_picks || []) if (pk.owner_id) (got[pk.owner_id] ||= []).push(`${pk.season} Rd ${pk.round} pick`);
+      const sides = (x.roster_ids || []).map(rid => {
+        const items = got[rid] || [];
+        const name = ownerName(rid) || teamName(rid).split(' ')[0];
+        return `<b>${esc(name)}</b> got ${items.length ? esc(items.join(', ')) : 'nothing'}`;
+      });
+      trades.push({ w, text: sides.join(' &mdash; ') });
+    }
+  }
+  if (!trades.length) return '';
+  trades.sort((a, b) => b.w - a.w);
+  const items = trades.map(t => `<div class="trade-item"><div class="trade-wk">Wk ${t.w}</div><div class="trade-sides">${t.text}</div></div>`).join('');
+  return `<div class="trade-log"><div class="chart-title" style="margin-bottom:8px">Trades</div>${items}</div>`;
 }
 function renderMoney(){
   if (M.season == null) return;
@@ -1206,7 +1262,8 @@ function renderMoney(){
     ${boomerangSection()}
     ${earningsChart(entries)}
     ${weeklyWinsChart()}
-    ${rows ? `<ul class="titles">${rows}</ul>` : '<p class="sub">No weekly prizes paid yet.</p>'}`;
+    ${rows ? `<ul class="titles">${rows}</ul>` : '<p class="sub">No weekly prizes paid yet.</p>'}
+    ${tradeLog()}`;
   $('money').classList.remove('hidden');
   renderStandings();
 }
