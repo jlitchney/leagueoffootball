@@ -218,6 +218,14 @@ button{cursor:pointer}
 .stat-table td:nth-child(2){text-align:left}
 .lk-pos{color:var(--live);font-weight:600}
 .lk-neg{color:var(--bad);font-weight:600}
+.sstk{text-align:center;font-size:12px;font-weight:700}
+.sstk-w{color:var(--live)}
+.sstk-l{color:var(--bad)}
+.results-grid{width:100%;border-collapse:collapse;font-size:11px}
+.results-grid th,.results-grid td{padding:3px 5px;text-align:center;color:var(--muted)}
+.rg-name{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72px;font-weight:500;color:var(--ink)}
+.rg-w{color:var(--live);font-weight:700}
+.rg-l{color:var(--bad);font-weight:700}
 </style>
 </head>
 <body>
@@ -1128,6 +1136,59 @@ function computeLuck() {
     .map(([rid, d]) => ({ rid: +rid, actual: d.actual, expected: d.expected, luck: d.actual - d.expected }))
     .sort((a, b) => b.luck - a.luck);
 }
+function computeStreaks() {
+  const res = {};
+  for (const r of S.rosters) res[r.roster_id] = [];
+  for (let w = M.done; w >= 1; w--) {
+    const wk = M.weeks[w]; if (!wk?.length) continue;
+    const map = {};
+    wk.forEach(m => { (map[m.matchup_id] ||= []).push(m); });
+    for (const pair of Object.values(map)) {
+      if (pair.length !== 2) continue;
+      const [a, b] = pair;
+      const ap = a.points || 0, bp = b.points || 0;
+      if (res[a.roster_id]) res[a.roster_id].push(ap > bp ? 'W' : ap < bp ? 'L' : 'T');
+      if (res[b.roster_id]) res[b.roster_id].push(bp > ap ? 'W' : bp < ap ? 'L' : 'T');
+    }
+  }
+  const out = {};
+  for (const [rid, results] of Object.entries(res)) {
+    if (!results.length) { out[+rid] = null; continue; }
+    const type = results[0]; let count = 0;
+    for (const r of results) { if (r === type) count++; else break; }
+    out[+rid] = { type, count };
+  }
+  return out;
+}
+function resultsGrid(rows) {
+  if (!M.done) return '';
+  const map = {};
+  for (const row of rows) map[row.rid] = {};
+  for (let w = 1; w <= M.done; w++) {
+    const wk = M.weeks[w]; if (!wk?.length) continue;
+    const pm = {};
+    wk.forEach(m => { (pm[m.matchup_id] ||= []).push(m); });
+    for (const pair of Object.values(pm)) {
+      if (pair.length !== 2) continue;
+      const [a, b] = pair;
+      const ap = a.points || 0, bp = b.points || 0;
+      if (map[a.roster_id] !== undefined) map[a.roster_id][w] = ap > bp ? 'W' : ap < bp ? 'L' : 'T';
+      if (map[b.roster_id] !== undefined) map[b.roster_id][w] = bp > ap ? 'W' : bp < ap ? 'L' : 'T';
+    }
+  }
+  const weeks = Array.from({length: M.done}, (_, i) => i + 1);
+  const hdr = '<tr><th style="text-align:left">Team</th>' + weeks.map(w => '<th>' + w + '</th>').join('') + '</tr>';
+  const trs = rows.map(row => {
+    const name = esc((ownerName(row.rid) || teamName(row.rid)).split(' ')[0]);
+    const cells = weeks.map(w => {
+      const r = map[row.rid]?.[w];
+      if (!r) return '<td></td>';
+      return '<td class="rg-' + r.toLowerCase() + '">' + r + '</td>';
+    }).join('');
+    return '<tr><td class="rg-name">' + name + '</td>' + cells + '</tr>';
+  }).join('');
+  return '<div class="stat-section"><h2>Season Results</h2><div style="overflow-x:auto"><table class="results-grid"><thead>' + hdr + '</thead><tbody>' + trs + '</tbody></table></div></div>';
+}
 function renderStandings(){
   const el = $('standings');
   if (!el || !S.rosters.length) return;
@@ -1161,17 +1222,21 @@ function renderStandings(){
       row.status = gap > remaining ? 'eliminated' : 'bubble';
     }
   });
+  const streaks = M.done > 0 ? computeStreaks() : {};
   const trs = rows.map((row, i) => {
-    const cut = i === SPOTS ? '<tr class="cutline"><td colspan="5"></td></tr>' : '';
+    const cut = i === SPOTS ? '<tr class="cutline"><td colspan="6"></td></tr>' : '';
     const owner = ownerName(row.rid);
     const hDisp = Number.isInteger(row.h) ? row.h : row.h.toFixed(1);
     const badge = `<span class="ps-badge ${BADGE[row.status]}">${LABEL[row.status]}</span>`;
+    const stk = streaks[row.rid];
+    const stkHtml = stk ? `<td class="sstk sstk-${stk.type.toLowerCase()}">${stk.type}${stk.count}</td>` : '<td></td>';
     return `${cut}<tr class="${i < SPOTS ? '' : 'out'}">
       <td class="rank">${i + 1}</td>
       <td class="sname">${esc(teamName(row.rid))}${badge}${owner ? `<span class="sowner">${esc(owner)}</span>` : ''}</td>
       <td class="swl">${row.w}-${row.l}</td>
       <td class="spf">${fmt(row.pf)}</td>
       <td class="shsw">${hDisp}</td>
+      ${stkHtml}
     </tr>`;
   }).join('');
   let prHtml = '', luckHtml = '';
@@ -1205,11 +1270,11 @@ function renderStandings(){
       '</tbody></table></div>';
   }
   el.innerHTML = '<h2>Standings</h2>' +
-    '<table class="stand-table"><thead><tr><th></th><th>Team</th><th>W-L</th><th>PF</th><th>HSW</th></tr></thead>' +
+    '<table class="stand-table"><thead><tr><th></th><th>Team</th><th>W-L</th><th>PF</th><th>HSW</th><th>Streak</th></tr></thead>' +
     '<tbody>' + trs + '</tbody></table>' +
     '<p class="note">HSW = weekly high score wins (' + usd(PAYOUTS.weeklyHigh) + ' prize each). Dashed line = playoff cutoff. ' +
     (remaining > 0 ? remaining + ' week' + (remaining !== 1 ? 's' : '') + ' remaining.' : 'Regular season complete.') + '</p>' +
-    prHtml + luckHtml + activityLog();
+    prHtml + luckHtml + resultsGrid(rows) + activityLog();
 }
 async function loadMoney(){
   if (!S.league || !S.nfl) return;
