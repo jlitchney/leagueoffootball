@@ -145,6 +145,23 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
 .tabs{display:flex;border-bottom:1px solid var(--line);margin-bottom:14px}
 .tab{flex:1;padding:10px 4px 9px;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;font:600 13px/1.2 var(--body);color:var(--muted)}
 .tab.active{color:var(--me);border-bottom-color:var(--me)}
+.bowner{font-size:11px;color:var(--muted);margin-top:1px}
+.hs-race{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:10px}
+.hs-title{font:700 12px/1 var(--body);text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+.hs-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}
+.hs-row b{font-weight:600}
+.stand-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.stand-table th{text-align:left;padding:6px 4px;border-bottom:2px solid var(--line);font:600 11px/1 var(--body);text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.stand-table th:nth-child(n+3){text-align:right}
+.stand-table td{padding:9px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+.stand-table .rank{color:var(--muted);font-size:12px;width:18px;text-align:center}
+.sname{font-weight:500}
+.sowner{display:block;font-size:11px;color:var(--muted);font-weight:400;margin-top:1px}
+.swl,.spf,.shsw{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stand-table .cutline td{padding:0;height:0;border-bottom:2px dashed var(--bad)}
+.stand-table tr.out td{opacity:.65}
+.bench-section{margin-top:12px}
+.bench-hdr{display:grid;grid-template-columns:1fr auto 1fr;padding:6px 0;color:var(--muted);font:600 11px/1 var(--body);text-transform:uppercase;letter-spacing:.5px;border-top:2px solid var(--line);text-align:center}
 </style>
 </head>
 <body>
@@ -165,6 +182,7 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
   <section id="app" class="hidden">
     <nav class="tabs">
       <button class="tab active" data-tab="score">Scoreboard</button>
+      <button class="tab" data-tab="stand">Standings</button>
       <button class="tab" data-tab="money">Money</button>
       <button class="tab" data-tab="champs">Champions</button>
     </nav>
@@ -180,6 +198,7 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
       </div>
       <select class="pick" id="matchupPick" aria-label="Matchup"></select>
       <div id="main"></div>
+      <div id="hs-race"></div>
       <div class="status"><span id="liveLbl"></span><span id="updated"></span></div>
       <section class="roasts hidden" id="roasts">
         <h2>Roasts</h2>
@@ -206,6 +225,9 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
     <div id="page-champs" class="page hidden">
       <section class="hall" id="hall"></section>
     </div>
+    <div id="page-stand" class="page hidden">
+      <section id="standings"></section>
+    </div>
   </section>
 
 </div>
@@ -224,6 +246,20 @@ const CHAMPIONS = [
 
 /* Payouts. Weekly prize goes to the week's top score; ties split it. */
 const PAYOUTS = { weeklyHigh: 50, first: 170, second: 70, third: 50, weeklyThroughPlayoffs: false };
+
+/* Sleeper username -> real name for all 10 members */
+const MEMBERS = {
+  JLitchney:         'Jason Litchney',
+  legendaryashty:    'Ashton Litchney',
+  anderdingus111:    'Andrew Litchney',
+  bigalitch:         'Aidan Litchney',
+  slitchney:         'Sarah Litchney',
+  GrandmaAngie1:     'Angie Litchney',
+  MERICATHEGREAT:    'Erica Arashiro',
+  '67MasterOogway':  'Savannah Arashiro',
+  CambiLIECambiDIE:  'Cambria Arashiro',
+  evilgabrielwins:   'Gabby Swank',
+};
 
 /* Site settings live in config.js so updates to this file never overwrite them. */
 const CONFIG = window.LEAGUE_CONFIG || {};
@@ -397,6 +433,12 @@ function teamName(rid){
   const u = r && S.users[r.owner_id];
   return u ? (u.metadata?.team_name || u.display_name) : 'Team ' + rid;
 }
+function ownerName(rid){
+  const r = S.rosters.find(x => x.roster_id === rid);
+  const u = r && S.users[r.owner_id];
+  if (!u) return null;
+  return MEMBERS[u.display_name] || MEMBERS[u.username] || null;
+}
 function myRosterId(){
   if (S.cfg.rosterId) return S.cfg.rosterId;
   const r = S.rosters.find(x => x.owner_id === S.cfg.userId || (x.co_owners || []).includes(S.cfg.userId));
@@ -424,8 +466,22 @@ function side(m){
   const filled = rows.filter(r => !r.empty);
   const roster = S.rosters.find(x => x.roster_id === m.roster_id);
   const w = roster?.settings?.wins ?? 0, l = roster?.settings?.losses ?? 0;
+  const starterSet = new Set(m.starters || []);
+  const bench = (m.players || []).filter(pid => pid && pid !== '0' && !starterSet.has(pid)).map(pid => {
+    const info = S.players[pid] || [pid, '', null, null];
+    const bpts = m.players_points?.[pid] ?? 0;
+    const bproj = S.proj ? (S.proj[pid] ?? 0) : null;
+    const bteam = info[2];
+    let bgame = null, bmin = null;
+    if (S.games) { bgame = S.games[bteam] || null; bmin = bgame ? bgame.min : 0; }
+    let blive;
+    if (bproj == null) blive = bpts;
+    else if (bmin == null) blive = bpts > 0 ? bpts : bproj;
+    else blive = bpts + bproj * (bmin / 60);
+    return { pid, slot:'BN', pos:info[1], name:info[0], team:bteam, inj:info[3], pts:bpts, proj:bproj, live:blive, min:bmin, game:bgame };
+  });
   return {
-    name: teamName(m.roster_id), rows,
+    name: teamName(m.roster_id), owner: ownerName(m.roster_id), rows, bench,
     points: m.points ?? filled.reduce((a, r) => a + r.pts, 0),
     live: rows.reduce((a, r) => a + r.live, 0),
     minLeft: rows.reduce((a, r) => a + (r.min || 0), 0),
@@ -491,6 +547,7 @@ function teamBlock(t, side) {
     <div class="bsc ${cls}">${splitPts(t.points)}</div>
     <div class="bproj">Proj <b>${fmt(t.live)}</b></div>
     <div class="bname">${esc(t.name)}</div>
+    ${t.owner ? `<div class="bowner">${esc(t.owner)}</div>` : ''}
     ${t.record ? `<div class="brec">${esc(t.record)}</div>` : ''}
     <div class="bbar-wrap"><div class="bbar ${cls}" style="width:${pct.toFixed(1)}%"></div></div>
     ${minsLabel ? `<div class="bmin-txt">${minsLabel}</div>` : ''}
@@ -535,6 +592,14 @@ function render(){
     rows += `<div class="row">${playerSide(a, false)}${rowScores(a, b)}${playerSide(b, true)}</div>`;
   }
 
+  const nb = Math.max(A.bench?.length || 0, B ? B.bench?.length || 0 : 0);
+  let benchRows = '';
+  for (let i = 0; i < nb; i++) {
+    const a = A.bench?.[i], b = B?.bench?.[i];
+    benchRows += `<div class="row">${playerSide(a, false)}${rowScores(a, b)}${playerSide(b, true)}</div>`;
+  }
+  const benchSection = nb ? `<div class="bench-section"><div class="bench-hdr"><div></div><div>Bench</div><div></div></div><div class="rows">${benchRows}</div></div>` : '';
+
   $('main').innerHTML = `
     <section class="board">
       ${teamBlock(A, 'a')}
@@ -543,10 +608,12 @@ function render(){
     </section>
     ${verdict ? `<div class="verdict">${verdict}</div>` : ''}
     <div class="rows">${rows}</div>
+    ${benchSection}
     ${S.proj ? '' : '<div class="msg">Projections didn’t load, so projected totals show points scored only.</div>'}
     ${S.games ? '' : '<div class="msg">Game clocks didn’t load from ESPN, so minutes left aren’t shown. It will retry.</div>'}`;
   updateStatus();
   renderMoney();
+  renderHighScoreRace();
 }
 function updateStatus(){
   const live = S.games && Object.values(S.games).some(g => g.state === 'in');
@@ -728,6 +795,79 @@ function ago(t){
 /* ---------- money ---------- */
 const M = { season: null, weeks: {}, bracket: null, done: 0, lastWeek: 14 };
 const usd = n => '$' + (Number.isInteger(n) ? n : n.toFixed(2));
+function renderHighScoreRace(){
+  const el = $('hs-race');
+  if (!el) return;
+  const thisWeek = !M.pastSeason && S.nfl && S.week === (S.nfl.week || 0) && S.week <= M.lastWeek;
+  if (!thisWeek || !S.matchups?.length) { el.innerHTML = ''; return; }
+  const teams = S.matchups.map(m => {
+    let live = m.points || 0;
+    if (S.proj && S.games) {
+      live = 0;
+      for (let i = 0; i < (m.starters || []).length; i++) {
+        const pid = m.starters[i];
+        if (!pid || pid === '0') continue;
+        const pts = (m.starters_points || [])[i] ?? m.players_points?.[pid] ?? 0;
+        const proj = S.proj[pid] ?? 0;
+        const team = (S.players[pid] || [])[2];
+        const game = team ? (S.games[team] || null) : null;
+        const min = game ? game.min : 0;
+        live += pts + proj * (min / 60);
+      }
+    }
+    return { rid: m.roster_id, pts: m.points || 0, live };
+  });
+  const byPts = [...teams].sort((a, b) => b.pts - a.pts);
+  const byLive = [...teams].sort((a, b) => b.live - a.live);
+  const top = byPts[0];
+  const projTop = byLive[0];
+  const same = top.rid === projTop.rid;
+  const topLabel = esc(ownerName(top.rid) || teamName(top.rid));
+  const projLabel = esc(ownerName(projTop.rid) || teamName(projTop.rid));
+  el.innerHTML = `<div class="hs-race">
+    <div class="hs-title">Week ${S.week} High Score Race &mdash; ${usd(PAYOUTS.weeklyHigh)} prize</div>
+    <div class="hs-row"><span>Scoring leader</span><b>${topLabel} &mdash; ${fmt(top.pts)}</b></div>
+    ${same
+      ? `<div class="hs-row"><span>Projected total</span><b>${fmt(projTop.live)}</b></div>`
+      : `<div class="hs-row"><span>Projected to win</span><b>${projLabel} &mdash; ${fmt(projTop.live)}</b></div>`}
+  </div>`;
+}
+function renderStandings(){
+  const el = $('standings');
+  if (!el || !S.rosters.length) return;
+  const hsw = {};
+  for (let w = 1; w <= M.done; w++) {
+    const ms = M.weeks[w]; if (!ms?.length) continue;
+    const top = Math.max(...ms.map(m => m.points || 0)); if (!top) continue;
+    const winners = ms.filter(m => (m.points || 0) === top);
+    for (const m of winners) hsw[m.roster_id] = (hsw[m.roster_id] || 0) + 1 / winners.length;
+  }
+  const spots = S.league?.settings?.playoff_teams || 6;
+  const rows = S.rosters.map(r => {
+    const w = r.settings?.wins ?? 0;
+    const l = r.settings?.losses ?? 0;
+    const pf = (r.settings?.fpts ?? 0) + (r.settings?.fpts_decimal ?? 0) / 100;
+    return { rid: r.roster_id, w, l, pf, h: hsw[r.roster_id] || 0 };
+  }).sort((a, b) => b.w - a.w || a.l - b.l || b.pf - a.pf);
+  const trs = rows.map((row, i) => {
+    const cut = i === spots ? '<tr class="cutline"><td colspan="5"></td></tr>' : '';
+    const owner = ownerName(row.rid);
+    const hDisp = Number.isInteger(row.h) ? row.h : row.h.toFixed(1);
+    return `${cut}<tr class="${i < spots ? '' : 'out'}">
+      <td class="rank">${i + 1}</td>
+      <td class="sname">${esc(teamName(row.rid))}${owner ? `<span class="sowner">${esc(owner)}</span>` : ''}</td>
+      <td class="swl">${row.w}-${row.l}</td>
+      <td class="spf">${fmt(row.pf)}</td>
+      <td class="shsw">${hDisp}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `<h2>Standings</h2>
+    <table class="stand-table">
+      <thead><tr><th></th><th>Team</th><th>W-L</th><th>PF</th><th>HSW</th></tr></thead>
+      <tbody>${trs}</tbody>
+    </table>
+    <p class="note">HSW = weekly high score wins (${usd(PAYOUTS.weeklyHigh)} prize each). Dashed line = playoff cutoff.</p>`;
+}
 async function loadMoney(){
   if (!S.league || !S.nfl) return;
   const lastWeek = PAYOUTS.weeklyThroughPlayoffs ? 17 : ((S.league.settings?.playoff_week_start || 15) - 1);
@@ -781,6 +921,7 @@ function renderMoney(){
     ${pace}
     ${rows ? `<ul class="titles">${rows}</ul>` : '<p class="sub">No weekly prizes paid yet.</p>'}`;
   $('money').classList.remove('hidden');
+  renderStandings();
 }
 
 $('enableAlerts').onclick = enableAlerts;
