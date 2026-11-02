@@ -36,7 +36,7 @@
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.4 var(--body);-webkit-font-smoothing:antialiased}
-.wrap{max-width:640px;margin:0 auto;padding:12px 14px 100px}
+.wrap{max-width:640px;margin:0 auto;padding:12px 14px 40px}
 button,select,input{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--me);outline-offset:2px}
@@ -142,9 +142,9 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
 .titles small{display:block;color:var(--muted);font-size:12px}
 .hidden{display:none!important}
 @media (prefers-reduced-motion: reduce){}
-.tabs{display:flex;background:var(--surface);border-top:1px solid var(--line);position:fixed;bottom:0;left:0;right:0;padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
-.tab{flex:1;padding:10px 4px 8px;background:none;border:0;border-radius:0;font:600 12px/1.2 var(--body);color:var(--muted)}
-.tab.active{color:var(--me)}
+.tabs{display:flex;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tab{flex:1;padding:10px 4px 9px;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;font:600 13px/1.2 var(--body);color:var(--muted)}
+.tab.active{color:var(--me);border-bottom-color:var(--me)}
 </style>
 </head>
 <body>
@@ -163,6 +163,11 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
   </section>
 
   <section id="app" class="hidden">
+    <nav class="tabs">
+      <button class="tab active" data-tab="score">Scoreboard</button>
+      <button class="tab" data-tab="money">Money</button>
+      <button class="tab" data-tab="champs">Champions</button>
+    </nav>
     <div id="page-score" class="page">
       <div class="top">
         <div class="league" id="leagueName"></div>
@@ -201,11 +206,6 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
     <div id="page-champs" class="page hidden">
       <section class="hall" id="hall"></section>
     </div>
-    <nav class="tabs">
-      <button class="tab active" data-tab="score">Scoreboard</button>
-      <button class="tab" data-tab="money">Money</button>
-      <button class="tab" data-tab="champs">Champions</button>
-    </nav>
   </section>
 
 </div>
