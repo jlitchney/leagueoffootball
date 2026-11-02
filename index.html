@@ -56,8 +56,11 @@ button{cursor:pointer}
 
 /* scoreboard header */
 .board{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 14px 14px}
-.bteam{min-width:0}
+.bteam{min-width:0;position:relative;border-radius:10px;transition:box-shadow .25s}
 .bteam.r{text-align:right}
+.proj-win{box-shadow:0 0 0 2px var(--live)}
+.bwin{position:absolute;top:0;right:0;font:700 12px/1 var(--body);color:var(--live)}
+.bteam.r .bwin{right:auto;left:0}
 .bsc{font:800 44px/1 var(--display);letter-spacing:-.5px;font-variant-numeric:tabular-nums}
 .bsc .sd{font-size:22px;vertical-align:super;letter-spacing:0;font-weight:700}
 .bsc.a{color:var(--me)}
@@ -576,11 +579,14 @@ function rowScores(a, b) {
   const sc = r => r ? `<div class="sc">${splitPts(r.pts)}</div><div class="sp">${proj(r) || '&nbsp;'}</div>` : '';
   return `<div class="rscores"><div class="rscore ${cls(a||{},b)}">${sc(a)}</div><div class="rsep"></div><div class="rscore ${b ? cls(b,a) : ''}">${sc(b)}</div></div>`;
 }
-function teamBlock(t, side) {
+function teamBlock(t, side, winPct) {
   const cls = side;
   const pct = t.minTotal ? (t.minLeft / t.minTotal) * 100 : 0;
   const minsLabel = S.games ? `${Math.round(t.minLeft)} min left` : '';
-  return `<div class="bteam${side === 'b' ? ' r' : ''}">
+  const winning = winPct != null && winPct > 0.5;
+  const badge = winning ? `<div class="bwin">${Math.round(winPct * 100)}%</div>` : '';
+  return `<div class="bteam${side === 'b' ? ' r' : ''}${winning ? ' proj-win' : ''}">
+    ${badge}
     <div class="bsc ${cls}">${splitPts(t.points)}</div>
     <div class="bproj">Proj <b>${fmt(t.live)}</b></div>
     <div class="bname">${esc(t.name)}</div>
@@ -615,6 +621,15 @@ function render(){
   const pair = ps.find(p => p[0].matchup_id === S.sel);
   const A = side(pair[0]), B = pair[1] ? side(pair[1]) : null;
 
+  let aWinProb = null, bWinProb = null;
+  if (B) {
+    const remA = Math.max(0, A.live - A.points);
+    const remB = Math.max(0, B.live - B.points);
+    const sig = Math.sqrt(remA * remA + remB * remB) * 0.35;
+    aWinProb = sig < 0.05 ? (A.live > B.live ? 1 : A.live < B.live ? 0 : 0.5) : normCdf((A.live - B.live) / sig);
+    bWinProb = 1 - aWinProb;
+  }
+
   let verdict = '';
   if (B) {
     const diff = A.live - B.live, isMine = pair[0].roster_id === mine;
@@ -646,9 +661,9 @@ function render(){
 
   $('main').innerHTML = `
     <section class="board">
-      ${teamBlock(A, 'a')}
+      ${teamBlock(A, 'a', aWinProb)}
       <div class="bvs">VS</div>
-      ${B ? teamBlock(B, 'b') : '<div class="bteam r"><div class="bname">Bye</div></div>'}
+      ${B ? teamBlock(B, 'b', bWinProb) : '<div class="bteam r"><div class="bname">Bye</div></div>'}
     </section>
     ${verdict ? `<div class="verdict">${verdict}</div>` : ''}
     <div class="rows">${rows}</div>
@@ -897,6 +912,12 @@ function ago(t){
 /* ---------- money ---------- */
 const M = { season: null, weeks: {}, bracket: null, done: 0, lastWeek: 14 };
 const usd = n => '$' + (Number.isInteger(n) ? n : n.toFixed(2));
+function normCdf(z){
+  if (z < -6) return 0; if (z > 6) return 1;
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const p = 1 - 0.3989422804 * Math.exp(-z*z/2) * t*(0.3193815+t*(-0.3565638+t*(1.7814779+t*(-1.8212560+t*1.3302744))));
+  return z >= 0 ? p : 1-p;
+}
 function winProbsMC(teams){
   const wins = new Array(teams.length).fill(0);
   for (let i = 0; i < 3000; i++) {
