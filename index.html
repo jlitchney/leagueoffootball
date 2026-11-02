@@ -239,8 +239,9 @@ button{cursor:pointer}
 .results-grid{width:100%;border-collapse:collapse;font-size:11px}
 .results-grid th,.results-grid td{padding:3px 5px;text-align:center;color:var(--muted)}
 .rg-name{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72px;font-weight:500;color:var(--ink)}
-.rg-w{color:var(--live);font-weight:700}
-.rg-l{color:var(--bad);font-weight:700}
+.rg-w,.rg-l{font-size:10px}
+.rg-w{color:var(--live)}
+.rg-l{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -931,7 +932,7 @@ function renderHall(){
   const owners = Object.values(by).sort((a, b) => b.years.length - a.years.length || Math.max(...b.years) - Math.max(...a.years));
   const yrs = o => o.years.map(y => "'" + String(y).slice(2)).join(', ');
   const champPhoto = CHAMP_PHOTOS[champ.year]
-    ? `<div class="champ-hero"><img src="${esc(CHAMP_PHOTOS[champ.year])}" alt="${esc(champ.owner)} ${champ.year} champion">
+    ? `<div class="champ-hero"><img src="${encodeURIComponent(CHAMP_PHOTOS[champ.year])}" alt="${esc(champ.owner)} ${champ.year} champion">
         <div class="champ-hero-cap"><div class="cap-name">${esc(champ.owner)}</div><div class="cap-yr">${champ.year} Champion &mdash; ${esc(champ.team)}</div></div></div>`
     : '';
   $('hall').innerHTML = `
@@ -1211,7 +1212,7 @@ function resultsGrid(rows) {
     const cells = weeks.map(w => {
       const r = map[row.rid]?.[w];
       if (!r) return '<td></td>';
-      return '<td class="rg-' + r.toLowerCase() + '">' + r + '</td>';
+      return '<td class="rg-' + r.toLowerCase() + '">' + (r === 'W' ? '●' : '●') + '</td>';
     }).join('');
     return '<tr><td class="rg-name">' + name + '</td>' + cells + '</tr>';
   }).join('');
