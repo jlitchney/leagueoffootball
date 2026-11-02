@@ -34,7 +34,7 @@
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.4 var(--body);-webkit-font-smoothing:antialiased}
-.wrap{max-width:640px;margin:0 auto;padding:12px 14px 40px}
+.wrap{max-width:640px;margin:0 auto;padding:12px 14px 100px}
 button,select,input{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--me);outline-offset:2px}
@@ -132,6 +132,9 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
 .titles small{display:block;color:var(--muted);font-size:12px}
 .hidden{display:none!important}
 @media (prefers-reduced-motion: reduce){.field i{transition:none}}
+.tabs{display:flex;background:var(--surface);border-top:1px solid var(--line);position:fixed;bottom:0;left:0;right:0;padding-bottom:env(safe-area-inset-bottom,0px);z-index:10}
+.tab{flex:1;padding:10px 4px 8px;background:none;border:0;border-radius:0;font:600 12px/1.2 var(--body);color:var(--muted)}
+.tab.active{color:var(--me)}
 </style>
 </head>
 <body>
@@ -150,38 +153,49 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
   </section>
 
   <section id="app" class="hidden">
-    <div class="top">
-      <div class="league" id="leagueName"></div>
-      <div class="wk">
-        <button id="prev" aria-label="Previous week">‹</button>
-        <span id="wkLabel"></span>
-        <button id="next" aria-label="Next week">›</button>
+    <div id="page-score" class="page">
+      <div class="top">
+        <div class="league" id="leagueName"></div>
+        <div class="wk">
+          <button id="prev" aria-label="Previous week">‹</button>
+          <span id="wkLabel"></span>
+          <button id="next" aria-label="Next week">›</button>
+        </div>
+        <button class="icon" id="refresh" aria-label="Refresh now">↻</button>
       </div>
-      <button class="icon" id="refresh" aria-label="Refresh now">↻</button>
+      <select class="pick" id="matchupPick" aria-label="Matchup"></select>
+      <div id="main"></div>
+      <div class="status"><span id="liveLbl"></span><span id="updated"></span></div>
+      <section class="roasts hidden" id="roasts">
+        <h2>Roasts</h2>
+        <div class="alerts" id="alerts"></div>
+        <div class="alertForm hidden" id="alertForm">
+          <label for="code">League code</label>
+          <input id="code" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <label for="alertTeam">Your team</label>
+          <select id="alertTeam"></select>
+          <button class="primary" id="enableAlerts">Turn on alerts</button>
+          <div id="alertErr"></div>
+        </div>
+        <ul class="feed" id="feed"></ul>
+      </section>
+      <p class="note">
+        Live projection = points so far + pregame projection × share of game left.
+        Game clocks come from ESPN’s public scoreboard and projections from Sleeper; both are unofficial feeds.
+        <br><button class="icon" id="change" style="margin-top:8px">Change team</button>
+      </p>
     </div>
-    <select class="pick" id="matchupPick" aria-label="Matchup"></select>
-    <div id="main"></div>
-    <div class="status"><span id="liveLbl"></span><span id="updated"></span></div>
-    <section class="roasts hidden" id="roasts">
-      <h2>Roasts</h2>
-      <div class="alerts" id="alerts"></div>
-      <div class="alertForm hidden" id="alertForm">
-        <label for="code">League code</label>
-        <input id="code" autocomplete="off" autocapitalize="off" spellcheck="false">
-        <label for="alertTeam">Your team</label>
-        <select id="alertTeam"></select>
-        <button class="primary" id="enableAlerts">Turn on alerts</button>
-        <div id="alertErr"></div>
-      </div>
-      <ul class="feed" id="feed"></ul>
-    </section>
-    <section class="hall hidden" id="money"></section>
-    <section class="hall" id="hall"></section>
-    <p class="note">
-      Live projection = points so far + pregame projection × share of game left.
-      Game clocks come from ESPN’s public scoreboard and projections from Sleeper; both are unofficial feeds.
-      <br><button class="icon" id="change" style="margin-top:8px">Change team</button>
-    </p>
+    <div id="page-money" class="page hidden">
+      <section class="hall hidden" id="money"></section>
+    </div>
+    <div id="page-champs" class="page hidden">
+      <section class="hall" id="hall"></section>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="score">Scoreboard</button>
+      <button class="tab" data-tab="money">Money</button>
+      <button class="tab" data-tab="champs">Champions</button>
+    </nav>
   </section>
 
 </div>
@@ -734,6 +748,14 @@ function renderMoney(){
 
 $('enableAlerts').onclick = enableAlerts;
 initPush();
+
+function showTab(name){
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-'+name).classList.remove('hidden');
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => showTab(t.dataset.tab));
 
 S.cfg = store.get('sd_cfg', {});
 if (S.cfg.leagueId) boot();
