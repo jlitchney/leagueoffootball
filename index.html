@@ -598,17 +598,11 @@ function rowScores(a, b) {
   const sc = r => r ? `<div class="sc">${splitPts(r.pts)}</div><div class="sp">${proj(r) || '&nbsp;'}</div>` : '';
   return `<div class="rscores"><div class="rscore ${cls(a||{},b)}">${sc(a)}</div><div class="rsep"></div><div class="rscore ${b ? cls(b,a) : ''}">${sc(b)}</div></div>`;
 }
-function winColor(winPct, isWinner) {
+function winColor(winPct) {
   if (winPct == null) return null;
-  const conf = Math.abs(winPct - 0.5) * 2;
-  const N = [75, 85, 99];
-  const W = [21, 128, 61];
-  const L = [185, 28, 28];
-  const target = isWinner ? W : L;
-  const r = Math.round(N[0] + (target[0] - N[0]) * conf);
-  const g = Math.round(N[1] + (target[1] - N[1]) * conf);
-  const b = Math.round(N[2] + (target[2] - N[2]) * conf);
-  return 'rgb(' + r + ',' + g + ',' + b + ')';
+  if (winPct >= 0.70) return '#15803D';
+  if (winPct <= 0.39) return '#B91C1C';
+  return '#4B5563';
 }
 function teamBlock(t, side, winPct) {
   const cls = side;
@@ -616,7 +610,7 @@ function teamBlock(t, side, winPct) {
   const minsLabel = S.games ? `${Math.round(t.minLeft)} min left` : '';
   const winning = winPct != null && winPct > 0.5;
   const pctLabel = winPct != null ? ` <span class="bproj-pct">· ${Math.round(winPct * 100)}%</span>` : '';
-  const scoreCol = winColor(winPct, winning);
+  const scoreCol = winColor(winPct);
   const scoreStyle = scoreCol ? ' style="color:' + scoreCol + '"' : '';
   return `<div class="bteam${side === 'b' ? ' r' : ''}${winning ? ' proj-win' : ''}">
     <div class="bsc ${cls}"${scoreStyle}>${splitPts(t.points)}</div>
