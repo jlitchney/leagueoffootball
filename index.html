@@ -609,7 +609,7 @@ function teamBlock(t, side, winPct) {
   const pct = t.minTotal ? (t.minLeft / t.minTotal) * 100 : 0;
   const minsLabel = S.games ? `${Math.round(t.minLeft)} min left` : '';
   const winning = winPct != null && winPct > 0.5;
-  const pctLabel = winPct != null ? ` <span class="bproj-pct">· ${Math.round(winPct * 100)}%</span>` : '';
+  const pctLabel = winPct != null ? ` <span class="bproj-pct" style="color:${winColor(winPct)}">· ${Math.round(winPct * 100)}%</span>` : '';
   const scoreCol = winColor(winPct);
   const scoreStyle = scoreCol ? ' style="color:' + scoreCol + '"' : '';
   return `<div class="bteam${side === 'b' ? ' r' : ''}${winning ? ' proj-win' : ''}">
