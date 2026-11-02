@@ -132,6 +132,11 @@ button{cursor:pointer}
 .plaque .tm{font:500 13px/1.25 Georgia,"Times New Roman",serif;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .plaque .ow{font:400 13px/1.25 Georgia,"Times New Roman",serif;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .plaque.reigning{border-color:#F0CE7A;box-shadow:0 0 0 2px var(--me)}
+.champ-hero{position:relative;margin-bottom:16px;border-radius:14px;overflow:hidden;background:#151515}
+.champ-hero img{width:100%;max-height:340px;object-fit:cover;object-position:top;display:block}
+.champ-hero-cap{position:absolute;bottom:0;left:0;right:0;padding:14px 16px;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff}
+.champ-hero-cap .cap-name{font:800 18px/1 var(--display);letter-spacing:-.2px}
+.champ-hero-cap .cap-yr{font:500 13px/1 var(--body);opacity:.85;margin-top:3px}
 .titles{margin:14px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
 .titles li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
 .titles .n{font:600 18px/1 var(--display);color:var(--me);white-space:nowrap}
@@ -320,6 +325,10 @@ const WEEKLY_MEDIA = {
   4: '2026-week-4.MOV',
   5: '2026-week-5.MOV',
   8: '2026-week-8.MOV',
+};
+// Add champion photo for each year: { year: 'filename' }
+const CHAMP_PHOTOS = {
+  2025: 'Gabby 2025 Champ.jpg',
 };
 
 /* Sleeper username -> real name for all 10 members */
@@ -907,8 +916,13 @@ function renderHall(){
   }
   const owners = Object.values(by).sort((a, b) => b.years.length - a.years.length || Math.max(...b.years) - Math.max(...a.years));
   const yrs = o => o.years.map(y => "'" + String(y).slice(2)).join(', ');
+  const champPhoto = CHAMP_PHOTOS[champ.year]
+    ? `<div class="champ-hero"><img src="${esc(CHAMP_PHOTOS[champ.year])}" alt="${esc(champ.owner)} ${champ.year} champion">
+        <div class="champ-hero-cap"><div class="cap-name">${esc(champ.owner)}</div><div class="cap-yr">${champ.year} Champion &mdash; ${esc(champ.team)}</div></div></div>`
+    : '';
   $('hall').innerHTML = `
     <h2>Champions</h2>
+    ${champPhoto}
     <p class="sub">Reigning: <b>${esc(champ.owner)}</b>, ${esc(champ.team)} (${champ.year})</p>
     ${champTimeline(list)}
     <div class="plaques">${list.map((c, i) => `
