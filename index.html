@@ -140,9 +140,11 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
   <section id="setup" class="setup hidden">
     <h1>Sunday, live.</h1>
     <p>Your Sleeper matchup with time left to play and projections that move with the game.</p>
-    <label for="who">Sleeper username or league ID</label>
-    <input id="who" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. jason123">
-    <button class="primary" id="go">Load my league</button>
+    <div id="whoBox">
+      <label for="who">Sleeper username or league ID</label>
+      <input id="who" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. jason123">
+      <button class="primary" id="go">Load my league</button>
+    </div>
     <div id="setupMsg"></div>
     <div id="choices" class="choices"></div>
   </section>
@@ -178,11 +180,12 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
     <p class="note">
       Live projection = points so far + pregame projection × share of game left.
       Game clocks come from ESPN’s public scoreboard and projections from Sleeper; both are unofficial feeds.
-      <br><button class="icon" id="change" style="margin-top:8px">Change league</button>
+      <br><button class="icon" id="change" style="margin-top:8px">Change team</button>
     </p>
   </section>
 
 </div>
+<script src="config.js"></script>
 <script>
 /* Past champions, straight off the trophy. Add a line here each year. */
 const CHAMPIONS = [
@@ -198,11 +201,10 @@ const CHAMPIONS = [
 /* Payouts. Weekly prize goes to the week's top score; ties split it. */
 const PAYOUTS = { weeklyHigh: 50, first: 170, second: 70, third: 50, weeklyThroughPlayoffs: false };
 
-/* Roast alerts: fill these in after deploying the worker (see SETUP.md). Leave blank to hide the section. */
-const PUSH = {
-  worker: 'https://league-bot.leagueoffootball.workers.dev',          // e.g. 'https://league-bot.yourname.workers.dev'
-  vapidPublicKey: 'BCv_d2cvPOaUSLIXlqOkxlGxCwp44WuM17QBqCvepfVBXdJk2Y8mP6P-iNjN57eucXpfcx898sVKfYL7RkGtzLA'   // the public key from `npx web-push generate-vapid-keys`
-};
+/* Site settings live in config.js so updates to this file never overwrite them. */
+const CONFIG = window.LEAGUE_CONFIG || {};
+const LEAGUE_ID = String(CONFIG.leagueId || '');
+const PUSH = { worker: CONFIG.worker || '', vapidPublicKey: CONFIG.vapidPublicKey || '' };
 
 const SL = 'https://api.sleeper.app/v1';
 const S = { cfg:{}, nfl:null, league:null, users:{}, rosters:[], players:{}, proj:null, projKey:'', projAt:0,
@@ -229,7 +231,15 @@ const SLOT_LBL = { SUPER_FLEX:'SF', FLEX:'FLX', REC_FLEX:'W/T', WRRB_FLEX:'W/R',
 function showSetup(msg){
   $('app').classList.add('hidden'); $('setup').classList.remove('hidden');
   $('choices').innerHTML = '';
+  $('whoBox').classList.remove('hidden');
   $('setupMsg').innerHTML = msg ? `<div class="msg err">${esc(msg)}</div>` : '';
+}
+async function pickTeam(){
+  showSetup();
+  $('whoBox').classList.add('hidden');
+  $('setupMsg').innerHTML = '<div class="msg">Loading teams…</div>';
+  try { await chooseLeague(LEAGUE_ID, null); }
+  catch (e) { $('setupMsg').innerHTML = `<div class="msg err">Couldn’t load the league: ${esc(e.message)}</div>`; }
 }
 async function startSetup(){
   const v = $('who').value.trim();
@@ -464,7 +474,11 @@ function render(){
     verdict = Math.abs(diff) < 0.05 ? 'Projected dead even'
       : isMine ? (diff > 0 ? `You’re projected to win by <b>${fmt(diff)}</b>` : `You’re projected to lose by <b>${fmt(-diff)}</b>`)
       : `${esc(leader.name)} projected by <b>${fmt(Math.abs(diff))}</b>`;
-    if (S.games) verdict += `<br>${A.now + A.yet ? `${A.now} playing, ${A.yet} yet to play` : 'All done'} vs ${B.now + B.yet ? `${B.now} playing, ${B.yet} yet to play` : 'all done'}`;
+    if (S.games) {
+      const left = t => [t.now && `${t.now} playing`, t.yet && `${t.yet} yet to play`].filter(Boolean).join(', ') || 'all done';
+      const l = left(A), r = left(B);
+      verdict += `<br>${l[0].toUpperCase() + l.slice(1)} vs ${r}`;
+    }
   }
 
   const n = Math.max(A.rows.length, B ? B.rows.length : 0);
@@ -526,7 +540,7 @@ $('prev').onclick = () => setWeek(S.week - 1);
 $('next').onclick = () => setWeek(S.week + 1);
 $('refresh').onclick = () => tick();
 $('matchupPick').onchange = e => { S.sel = Number(e.target.value); render(); };
-$('change').onclick = () => { store.del('sd_cfg'); clearTimeout(S.timer); S.cfg = {}; showSetup(); };
+$('change').onclick = () => { store.del('sd_cfg'); clearTimeout(S.timer); S.cfg = {}; LEAGUE_ID ? pickTeam() : showSetup(); };
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) clearTimeout(S.timer);
   else if (S.cfg.leagueId && S.league) (Date.now() - S.lastUpdate > 30e3 ? tick() : schedule());
@@ -722,7 +736,9 @@ $('enableAlerts').onclick = enableAlerts;
 initPush();
 
 S.cfg = store.get('sd_cfg', {});
-if (S.cfg.leagueId) boot(); else showSetup();
+if (S.cfg.leagueId) boot();
+else if (LEAGUE_ID) pickTeam();
+else showSetup();
 </script>
 </body>
 </html>
