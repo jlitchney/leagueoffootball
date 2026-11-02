@@ -49,7 +49,10 @@ button{cursor:pointer}
 .wk span{font:600 15px var(--body);min-width:62px;text-align:center}
 .icon{background:var(--surface);border:1px solid var(--line);border-radius:999px;height:34px;padding:0 12px}
 
-select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);margin-bottom:12px}
+.matchup-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.mm-btn{padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font:600 14px/1.2 var(--body);white-space:nowrap;flex-shrink:0;transition:background .15s,border-color .15s,color .15s}
+.mm-btn.active{background:var(--me);color:#1A1200;border-color:var(--me)}
+.mm-pick{flex:1;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);min-width:0;font:inherit;color:inherit}
 
 /* scoreboard header */
 .board{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 14px 14px}
@@ -224,7 +227,10 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
         </div>
         <button class="icon" id="refresh" aria-label="Refresh now">↻</button>
       </div>
-      <select class="pick" id="matchupPick" aria-label="Matchup"></select>
+      <div class="matchup-bar hidden" id="matchupBar">
+        <button class="mm-btn" id="myMatchupBtn">My Matchup</button>
+        <select class="mm-pick" id="matchupPick" aria-label="Other matchups"></select>
+      </div>
       <div id="main"></div>
       <div id="hs-race"></div>
       <div class="status"><span id="liveLbl"></span><span id="updated"></span></div>
@@ -586,18 +592,25 @@ function teamBlock(t, side) {
 }
 function render(){
   const ps = pairs();
-  const pick = $('matchupPick');
+  const bar = $('matchupBar'), pick = $('matchupPick');
   if (!ps.length) {
-    pick.classList.add('hidden');
+    bar.classList.add('hidden');
     $('main').innerHTML = `<div class="msg">No matchups for week ${S.week} yet.</div>`;
     return;
   }
-  pick.classList.remove('hidden');
+  bar.classList.remove('hidden');
   const mine = myRosterId();
   if (S.sel == null || !ps.some(p => p[0].matchup_id === S.sel)) {
     S.sel = (ps.find(p => p.some(m => m.roster_id === mine)) || ps[0])[0].matchup_id;
   }
-  pick.innerHTML = ps.map(p => `<option value="${p[0].matchup_id}" ${p[0].matchup_id === S.sel ? 'selected' : ''}>${esc(teamName(p[0].roster_id))} vs ${esc(p[1] ? teamName(p[1].roster_id) : 'bye')}</option>`).join('');
+  const myPair = ps.find(p => p.some(m => m.roster_id === mine));
+  const isMine = !!(myPair && myPair[0].matchup_id === S.sel);
+  const btn = $('myMatchupBtn');
+  btn.classList.toggle('hidden', !myPair);
+  btn.classList.toggle('active', isMine);
+  const others = myPair ? ps.filter(p => p[0].matchup_id !== myPair[0].matchup_id) : ps;
+  pick.innerHTML = `<option value="" disabled${isMine ? ' selected' : ''}>Other matchups…</option>` +
+    others.map(p => `<option value="${p[0].matchup_id}"${p[0].matchup_id === S.sel ? ' selected' : ''}>${esc(teamName(p[0].roster_id))} vs ${esc(p[1] ? teamName(p[1].roster_id) : 'Bye')}</option>`).join('');
 
   const pair = ps.find(p => p[0].matchup_id === S.sel);
   const A = side(pair[0]), B = pair[1] ? side(pair[1]) : null;
@@ -688,7 +701,8 @@ $('who').addEventListener('keydown', e => { if (e.key === 'Enter') startSetup();
 $('prev').onclick = () => setWeek(S.week - 1);
 $('next').onclick = () => setWeek(S.week + 1);
 $('refresh').onclick = () => tick();
-$('matchupPick').onchange = e => { S.sel = Number(e.target.value); render(); };
+$('matchupPick').onchange = e => { if (e.target.value) { S.sel = Number(e.target.value); render(); } };
+$('myMatchupBtn').onclick = () => { const p = pairs().find(pair => pair.some(m => m.roster_id === myRosterId())); if (p) { S.sel = p[0].matchup_id; render(); } };
 $('change').onclick = () => { store.del('sd_cfg'); clearTimeout(S.timer); S.cfg = {}; LEAGUE_ID ? pickTeam() : showSetup(); };
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) clearTimeout(S.timer);
