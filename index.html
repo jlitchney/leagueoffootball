@@ -19,7 +19,7 @@
 :root{
   color-scheme: light;
   --bg:#EEF1F5; --surface:#FFFFFF; --line:#DDE2EA; --ink:#121826; --muted:#5B6475;
-  --me:#C2410C; --opp:#1D4ED8; --turf-soft:#E6EAF0; --tick:rgba(18,24,38,.12); --bad:#B91C1C; --live:#15803D; --accent:#4F46E5;
+  --me:#C2410C; --opp:#1D4ED8; --turf-soft:#E6EAF0; --tick:rgba(18,24,38,.12); --bad:#B91C1C; --live:#15803D; --accent:#111827;
   --display:"Saira Extra Condensed","Arial Narrow",system-ui,sans-serif;
   --body:"Saira Semi Condensed",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   box-sizing:border-box;
@@ -171,9 +171,13 @@ button{cursor:pointer}
 .bbnch{font-size:11px;color:var(--muted);margin-top:2px}
 .h2h-rec{text-align:center;font-size:12px;color:var(--muted);margin:4px 0 2px}
 .trade-log{margin-top:22px}
-.trade-item{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.4}
-.trade-wk{flex-shrink:0;color:var(--muted);font-size:11px;font-weight:600;width:36px;padding-top:2px}
-.trade-sides{color:var(--ink)}
+.trade-item{display:flex;align-items:baseline;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.4}
+.trade-wk{flex-shrink:0;color:var(--muted);font-size:11px;font-weight:600;width:28px}
+.trade-sides{color:var(--ink);flex:1;min-width:0}
+.tx-tag{flex-shrink:0;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;letter-spacing:.4px}
+.tx-trade{background:rgba(17,24,39,.08);color:var(--ink)}
+.tx-move{background:rgba(91,100,117,.1);color:var(--muted)}
+.tx-grade{display:block;font-size:11px;color:var(--muted);margin-top:3px}
 /* charts */
 .chart-section{margin:16px 0}
 .chart-title{font:700 11px/1 var(--body);text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px}
@@ -353,6 +357,27 @@ async function j(url){
 const TEAM_FIX = { WSH:'WAS', JAC:'JAX', LA:'LAR' };
 const norm = t => TEAM_FIX[t] || t;
 const SLOT_LBL = { SUPER_FLEX:'SF', FLEX:'FLX', REC_FLEX:'W/T', WRRB_FLEX:'W/R', IDP_FLEX:'IDP', DEF:'DEF' };
+const SLOT_ELIG = { QB:['QB'], RB:['RB'], WR:['WR'], TE:['TE'], K:['K'], DEF:['DEF'], FLEX:['RB','WR','TE'], WRRB_FLEX:['WR','RB'], REC_FLEX:['WR','TE'], SUPER_FLEX:['QB','RB','WR','TE'], IDP_FLEX:['DL','LB','DB'] };
+function optimalScore(m) {
+  const slots = (S.league.roster_positions || []).filter(p => !['BN','IR','TAXI'].includes(p));
+  const pids = (m.players || []).filter(pid => pid && pid !== '0');
+  const pp = m.players_points || {};
+  const order = slots.map(s => SLOT_ELIG[s] || [s]).sort((a, b) => a.length - b.length);
+  const used = new Set();
+  let total = 0;
+  for (const elig of order) {
+    let best = null, bp = -Infinity;
+    for (const pid of pids) {
+      if (used.has(pid)) continue;
+      const pos = (S.players[pid] || [])[1];
+      if (!pos || !elig.includes(pos)) continue;
+      const v = pp[pid] ?? 0;
+      if (v > bp) { bp = v; best = pid; }
+    }
+    if (best) { used.add(best); total += Math.max(0, bp); }
+  }
+  return total;
+}
 
 /* ---------- setup ---------- */
 function showSetup(msg){
@@ -555,7 +580,8 @@ function side(m){
     minTotal: filled.length * 60,
     yet: filled.filter(r => r.game?.state === 'pre').length,
     now: filled.filter(r => r.game?.state === 'in').length,
-    record: (w || l) ? `${w}-${l}` : ''
+    record: (w || l) ? `${w}-${l}` : '',
+    optimal: optimalScore(m)
   };
 }
 function pairs(){
@@ -621,13 +647,17 @@ function teamBlock(t, side, winPct) {
   const scoreCol = t.points > 0 ? winColor(winPct) : null;
   const scoreStyle = scoreCol ? ' style="color:' + scoreCol + '"' : '';
   const benchPts = (t.bench || []).reduce((a, r) => a + (r.pts || 0), 0);
+  const left = t.points > 0.5 && t.optimal > t.points + 0.5 ? t.optimal - t.points : 0;
+  const benchLine = left > 0.5
+    ? `<div class="bbnch">Left ${fmt(left)} on bench</div>`
+    : benchPts > 0.05 ? `<div class="bbnch">Bench: ${fmt(benchPts)}</div>` : '';
   return `<div class="bteam${side === 'b' ? ' r' : ''}${winning ? ' proj-win' : ''}">
     <div class="bsc ${cls}"${scoreStyle}>${splitPts(t.points)}</div>
     <div class="bproj">Proj <b>${fmt(t.live)}</b>${pctLabel}</div>
     <div class="bname">${esc(t.name)}</div>
     ${t.owner ? `<div class="bowner">${esc(t.owner)}</div>` : ''}
     ${t.record ? `<div class="brec">${esc(t.record)}</div>` : ''}
-    ${benchPts > 0.05 ? `<div class="bbnch">Bench: ${fmt(benchPts)}</div>` : ''}
+    ${benchLine}
     <div class="bbar-wrap"><div class="bbar ${cls}" style="width:${pct.toFixed(1)}%"></div></div>
     ${minsLabel ? `<div class="bmin-txt">${minsLabel}</div>` : ''}
   </div>`;
@@ -1179,7 +1209,7 @@ function renderStandings(){
     '<tbody>' + trs + '</tbody></table>' +
     '<p class="note">HSW = weekly high score wins (' + usd(PAYOUTS.weeklyHigh) + ' prize each). Dashed line = playoff cutoff. ' +
     (remaining > 0 ? remaining + ' week' + (remaining !== 1 ? 's' : '') + ' remaining.' : 'Regular season complete.') + '</p>' +
-    prHtml + luckHtml;
+    prHtml + luckHtml + activityLog();
 }
 async function loadMoney(){
   if (!S.league || !S.nfl) return;
@@ -1197,28 +1227,73 @@ async function loadMoney(){
   M.done = done; M.lastWeek = lastWeek; M.pastSeason = pastSeason;
   renderMoney();
 }
-function tradeLog() {
+function tradeGrade(ridA, ridB, addedByA, addedByB, week) {
+  // Grade a trade by comparing how each side's received players actually scored after the trade
+  if (!addedByA.length && !addedByB.length) return null;
+  let ptsA = 0, ptsB = 0, weeks = 0;
+  for (let w = week; w <= M.done; w++) {
+    const ms = M.weeks[w]; if (!ms?.length) continue;
+    const mA = ms.find(m => m.roster_id === ridA);
+    const mB = ms.find(m => m.roster_id === ridB);
+    if (!mA || !mB) continue;
+    addedByA.forEach(pid => { ptsA += mA.players_points?.[pid] || 0; });
+    addedByB.forEach(pid => { ptsB += mB.players_points?.[pid] || 0; });
+    weeks++;
+  }
+  if (!weeks || (!ptsA && !ptsB)) return null;
+  const nameA = ownerName(ridA) || teamName(ridA).split(' ')[0];
+  const nameB = ownerName(ridB) || teamName(ridB).split(' ')[0];
+  if (Math.abs(ptsA - ptsB) < 5) return `Even so far`;
+  const winner = ptsA > ptsB ? nameA : nameB;
+  const diff = Math.abs(ptsA - ptsB);
+  return `${esc(winner)} +${fmt(diff)} pts`;
+}
+function activityLog() {
   if (!M.done) return '';
-  const trades = [];
+  const events = [];
   for (let w = 1; w <= M.done; w++) {
     const txs = M.trades_by_week[w] || [];
     for (const x of txs) {
-      if (x.type !== 'trade' || x.status !== 'complete') continue;
-      const got = {};
-      for (const [pid, rid] of Object.entries(x.adds || {})) (got[rid] ||= []).push(S.players[pid]?.[0] || pid);
-      for (const pk of x.draft_picks || []) if (pk.owner_id) (got[pk.owner_id] ||= []).push(`${pk.season} Rd ${pk.round} pick`);
-      const sides = (x.roster_ids || []).map(rid => {
-        const items = got[rid] || [];
-        const name = ownerName(rid) || teamName(rid).split(' ')[0];
-        return `<b>${esc(name)}</b> got ${items.length ? esc(items.join(', ')) : 'nothing'}`;
-      });
-      trades.push({ w, text: sides.join(' &mdash; ') });
+      if (x.status !== 'complete') continue;
+      if (x.type === 'trade') {
+        const got = {};
+        for (const [pid, rid] of Object.entries(x.adds || {})) (got[+rid] ||= []).push(pid);
+        for (const pk of x.draft_picks || []) if (pk.owner_id) (got[+pk.owner_id] ||= []).push(null);
+        const rids = x.roster_ids || [];
+        const sides = rids.map(rid => {
+          const pids = (got[rid] || []).filter(Boolean);
+          const picks = (got[rid] || []).filter(p => p === null).length;
+          const names = pids.map(pid => S.players[pid]?.[0] || pid);
+          if (picks) names.push(picks + ' pick' + (picks > 1 ? 's' : ''));
+          const name = ownerName(rid) || teamName(rid).split(' ')[0];
+          return { name: esc(name), items: names, pids, rid };
+        });
+        const grade = rids.length === 2
+          ? tradeGrade(rids[0], rids[1], got[rids[0]]?.filter(Boolean) || [], got[rids[1]]?.filter(Boolean) || [], w)
+          : null;
+        const sideText = sides.map(s => `<b>${s.name}</b> got ${s.items.length ? esc(s.items.join(', ')) : 'nothing'}`).join(' &mdash; ');
+        const gradeHtml = grade ? `<span class="tx-grade">${esc(grade)}</span>` : '';
+        events.push({ w, tag: 'TRADE', cls: 'tx-trade', text: sideText + gradeHtml });
+      } else if (x.type === 'waiver' || x.type === 'free_agent') {
+        const rids = new Set([...Object.values(x.adds || {}), ...Object.values(x.drops || {})].map(Number));
+        for (const rid of rids) {
+          const added = Object.entries(x.adds || {}).filter(([, r]) => +r === rid).map(([pid]) => S.players[pid]?.[0] || pid);
+          const dropped = Object.entries(x.drops || {}).filter(([, r]) => +r === rid).map(([pid]) => S.players[pid]?.[0] || pid);
+          if (!added.length) continue;
+          const name = ownerName(rid) || teamName(rid).split(' ')[0];
+          let text = `<b>${esc(name)}</b> added ${esc(added.join(', '))}`;
+          if (dropped.length) text += ` &mdash; dropped ${esc(dropped.join(', '))}`;
+          events.push({ w, tag: x.type === 'waiver' ? 'WAIVER' : 'FA', cls: 'tx-move', text });
+        }
+      }
     }
   }
-  if (!trades.length) return '';
-  trades.sort((a, b) => b.w - a.w);
-  const items = trades.map(t => `<div class="trade-item"><div class="trade-wk">Wk ${t.w}</div><div class="trade-sides">${t.text}</div></div>`).join('');
-  return `<div class="trade-log"><div class="chart-title" style="margin-bottom:8px">Trades</div>${items}</div>`;
+  if (!events.length) return '';
+  events.sort((a, b) => b.w - a.w);
+  const items = events.map(t =>
+    `<div class="trade-item"><span class="tx-tag ${t.cls}">${t.tag}</span><div class="trade-wk">Wk ${t.w}</div><div class="trade-sides">${t.text}</div></div>`
+  ).join('');
+  return `<div class="trade-log"><div class="chart-title" style="margin-bottom:8px">Transactions</div>${items}</div>`;
 }
 function renderMoney(){
   if (M.season == null) return;
@@ -1262,8 +1337,7 @@ function renderMoney(){
     ${boomerangSection()}
     ${earningsChart(entries)}
     ${weeklyWinsChart()}
-    ${rows ? `<ul class="titles">${rows}</ul>` : '<p class="sub">No weekly prizes paid yet.</p>'}
-    ${tradeLog()}`;
+    ${rows ? `<ul class="titles">${rows}</ul>` : '<p class="sub">No weekly prizes paid yet.</p>'}`;
   $('money').classList.remove('hidden');
   renderStandings();
 }
