@@ -236,12 +236,13 @@ button{cursor:pointer}
 .sstk{text-align:center;font-size:12px;font-weight:700}
 .sstk-w{color:var(--live)}
 .sstk-l{color:var(--bad)}
-.results-grid{width:100%;border-collapse:collapse;font-size:11px}
-.results-grid th,.results-grid td{padding:3px 5px;text-align:center;color:var(--muted)}
-.rg-name{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72px;font-weight:500;color:var(--ink)}
-.rg-w,.rg-l{font-size:10px}
-.rg-w{color:var(--live)}
-.rg-l{color:var(--bad)}
+.results-grid{width:100%;border-collapse:separate;border-spacing:2px;font-size:10px}
+.results-grid th{padding:4px 2px;text-align:center;color:var(--muted);font-size:10px;font-weight:600}
+.results-grid td{width:22px;height:22px;padding:0;text-align:center;vertical-align:middle;border-radius:4px;font-size:9px;font-weight:700}
+.rg-name{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65px;font-weight:500;color:var(--ink);font-size:12px;padding-right:4px}
+.rg-w{background:rgba(21,128,61,.18);color:var(--live)}
+.rg-l{background:rgba(185,28,28,.12);color:var(--bad)}
+.rg-empty{background:var(--turf-soft)}
 </style>
 </head>
 <body>
@@ -1211,8 +1212,8 @@ function resultsGrid(rows) {
     const name = esc((ownerName(row.rid) || teamName(row.rid)).split(' ')[0]);
     const cells = weeks.map(w => {
       const r = map[row.rid]?.[w];
-      if (!r) return '<td></td>';
-      return '<td class="rg-' + r.toLowerCase() + '">' + (r === 'W' ? '●' : '●') + '</td>';
+      if (!r) return '<td class="rg-empty"></td>';
+      return '<td class="rg-' + r.toLowerCase() + '">' + r + '</td>';
     }).join('');
     return '<tr><td class="rg-name">' + name + '</td>' + cells + '</tr>';
   }).join('');
