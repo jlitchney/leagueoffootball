@@ -65,8 +65,7 @@ button{cursor:pointer}
 .bbar-wrap{height:3px;background:var(--line);border-radius:2px;margin-top:8px;overflow:hidden}
 .bteam.r .bbar-wrap{direction:rtl}
 .bbar{height:100%;border-radius:2px;transition:width .5s ease}
-.bbar.a{background:var(--me)}
-.bbar.b{background:var(--opp)}
+.bbar.a,.bbar.b{background:#94A3B8}
 .bmin-txt{font-size:11px;color:var(--muted);margin-top:3px}
 .verdict{text-align:center;color:var(--muted);font-size:13px;margin:10px 0 4px}
 .verdict b{color:var(--ink)}
@@ -614,7 +613,7 @@ function teamBlock(t, side, winPct) {
   const minsLabel = S.games ? `${Math.round(t.minLeft)} min left` : '';
   const winning = winPct != null && winPct > 0.5;
   const pctLabel = winPct != null ? ` <span class="bproj-pct" style="color:${winColor(winPct)}">· ${Math.round(winPct * 100)}%</span>` : '';
-  const scoreCol = winColor(winPct);
+  const scoreCol = t.points > 0 ? winColor(winPct) : null;
   const scoreStyle = scoreCol ? ' style="color:' + scoreCol + '"' : '';
   return `<div class="bteam${side === 'b' ? ' r' : ''}${winning ? ' proj-win' : ''}">
     <div class="bsc ${cls}"${scoreStyle}>${splitPts(t.points)}</div>
