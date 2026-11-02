@@ -921,7 +921,7 @@ function renderHighScoreRace(){
   const thisWeek = !M.pastSeason && S.nfl && S.week === (S.nfl.week || 0) && S.week <= M.lastWeek;
   if (!thisWeek || !S.matchups?.length) { el.innerHTML = ''; return; }
   const teams = S.matchups.map(m => {
-    let scored = m.points || 0, live = scored, remaining = 0, active = 0;
+    let scored = m.points || 0, live = scored, remaining = 0, active = 0, minLeft = 0;
     if (S.proj && S.games) {
       live = 0;
       for (let i = 0; i < (m.starters || []).length; i++) {
@@ -933,11 +933,11 @@ function renderHighScoreRace(){
         const game = nflTeam ? (S.games[nflTeam] || null) : null;
         const min = game ? game.min : 0;
         live += pts + proj * (min / 60);
-        if (min > 0) active++;
+        if (min > 0) { active++; minLeft += min; }
       }
       remaining = Math.max(0, live - scored);
     }
-    return { rid: m.roster_id, scored, live, remaining, active };
+    return { rid: m.roster_id, scored, live, remaining, active, minLeft };
   });
   teams.sort((a, b) => b.live - a.live);
   const probs = winProbsMC(teams);
@@ -946,10 +946,11 @@ function renderHighScoreRace(){
     const first = esc(name.split(' ')[0]);
     const pct = Math.round(probs[i] * 100);
     const barW = Math.round(probs[i] * 40);
-    const leftLbl = t.active > 0 ? t.active + ' live' : 'Done';
+    const leftLbl = t.active > 0 ? `${Math.round(t.minLeft)} min (${t.active})` : 'Done';
     return `<tr${i === 0 ? ' class="hs-leader"' : ''}>
       <td class="hs-rank">${i + 1}</td>
       <td>${first}</td>
+      <td>${fmt(t.scored)}</td>
       <td>${fmt(t.live)}</td>
       <td>${leftLbl}</td>
       <td><div class="hs-prob"><div class="hs-prob-bar" style="width:${barW}px"></div><span>${pct}%</span></div></td>
@@ -958,7 +959,7 @@ function renderHighScoreRace(){
   el.innerHTML = `<div class="hs-race">
     <div class="hs-title">Week ${S.week} High Score Race &mdash; ${usd(PAYOUTS.weeklyHigh)} prize</div>
     <table class="hs-table">
-      <thead><tr><th></th><th>Team</th><th>Proj</th><th>Left</th><th>Win%</th></tr></thead>
+      <thead><tr><th></th><th>Team</th><th>Current</th><th>Projected</th><th>Left</th><th>Win%</th></tr></thead>
       <tbody>${trs}</tbody>
     </table>
   </div>`;
