@@ -150,6 +150,16 @@ select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(
 .hs-title{font:700 12px/1 var(--body);text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
 .hs-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}
 .hs-row b{font-weight:600}
+.hs-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.hs-table th{padding:4px 3px 5px;text-align:right;font:600 10px/1 var(--body);text-transform:uppercase;letter-spacing:.3px;color:var(--muted);border-bottom:2px solid var(--line)}
+.hs-table th:nth-child(2){text-align:left}
+.hs-table td{padding:7px 3px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;vertical-align:middle}
+.hs-table td:nth-child(2){text-align:left;font-weight:500}
+.hs-rank{color:var(--muted);width:16px;text-align:center!important}
+.hs-prob{display:flex;align-items:center;justify-content:flex-end;gap:4px;white-space:nowrap}
+.hs-prob-bar{height:6px;border-radius:3px;background:var(--me);flex-shrink:0;min-width:0}
+.hs-table tr.hs-leader td{color:var(--me)}
+.hs-table tr.hs-leader td:nth-child(2){font-weight:700}
 .stand-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
 .stand-table th{text-align:left;padding:6px 4px;border-bottom:2px solid var(--line);font:600 11px/1 var(--body);text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
 .stand-table th:nth-child(n+3){text-align:right}
@@ -873,13 +883,31 @@ function ago(t){
 /* ---------- money ---------- */
 const M = { season: null, weeks: {}, bracket: null, done: 0, lastWeek: 14 };
 const usd = n => '$' + (Number.isInteger(n) ? n : n.toFixed(2));
+function winProbsMC(teams){
+  const wins = new Array(teams.length).fill(0);
+  for (let i = 0; i < 3000; i++) {
+    let best = 0, bestScore = -Infinity;
+    for (let j = 0; j < teams.length; j++) {
+      const t = teams[j];
+      const sigma = t.remaining * 0.35;
+      let s = t.live;
+      if (sigma > 0.05) {
+        const u = Math.max(1e-10, Math.random());
+        s += Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()) * sigma;
+      }
+      if (s > bestScore) { bestScore = s; best = j; }
+    }
+    wins[best]++;
+  }
+  return wins.map(w => w / 3000);
+}
 function renderHighScoreRace(){
   const el = $('hs-race');
   if (!el) return;
   const thisWeek = !M.pastSeason && S.nfl && S.week === (S.nfl.week || 0) && S.week <= M.lastWeek;
   if (!thisWeek || !S.matchups?.length) { el.innerHTML = ''; return; }
   const teams = S.matchups.map(m => {
-    let live = m.points || 0;
+    let scored = m.points || 0, live = scored, remaining = 0, active = 0;
     if (S.proj && S.games) {
       live = 0;
       for (let i = 0; i < (m.starters || []).length; i++) {
@@ -887,27 +915,38 @@ function renderHighScoreRace(){
         if (!pid || pid === '0') continue;
         const pts = (m.starters_points || [])[i] ?? m.players_points?.[pid] ?? 0;
         const proj = S.proj[pid] ?? 0;
-        const team = (S.players[pid] || [])[2];
-        const game = team ? (S.games[team] || null) : null;
+        const nflTeam = (S.players[pid] || [])[2];
+        const game = nflTeam ? (S.games[nflTeam] || null) : null;
         const min = game ? game.min : 0;
         live += pts + proj * (min / 60);
+        if (min > 0) active++;
       }
+      remaining = Math.max(0, live - scored);
     }
-    return { rid: m.roster_id, pts: m.points || 0, live };
+    return { rid: m.roster_id, scored, live, remaining, active };
   });
-  const byPts = [...teams].sort((a, b) => b.pts - a.pts);
-  const byLive = [...teams].sort((a, b) => b.live - a.live);
-  const top = byPts[0];
-  const projTop = byLive[0];
-  const same = top.rid === projTop.rid;
-  const topLabel = esc(ownerName(top.rid) || teamName(top.rid));
-  const projLabel = esc(ownerName(projTop.rid) || teamName(projTop.rid));
+  teams.sort((a, b) => b.live - a.live);
+  const probs = winProbsMC(teams);
+  const trs = teams.map((t, i) => {
+    const name = ownerName(t.rid) || teamName(t.rid);
+    const first = esc(name.split(' ')[0]);
+    const pct = Math.round(probs[i] * 100);
+    const barW = Math.round(probs[i] * 40);
+    const leftLbl = t.active > 0 ? t.active + ' live' : 'Done';
+    return `<tr${i === 0 ? ' class="hs-leader"' : ''}>
+      <td class="hs-rank">${i + 1}</td>
+      <td>${first}</td>
+      <td>${fmt(t.live)}</td>
+      <td>${leftLbl}</td>
+      <td><div class="hs-prob"><div class="hs-prob-bar" style="width:${barW}px"></div><span>${pct}%</span></div></td>
+    </tr>`;
+  }).join('');
   el.innerHTML = `<div class="hs-race">
     <div class="hs-title">Week ${S.week} High Score Race &mdash; ${usd(PAYOUTS.weeklyHigh)} prize</div>
-    <div class="hs-row"><span>Scoring leader</span><b>${topLabel} &mdash; ${fmt(top.pts)}</b></div>
-    ${same
-      ? `<div class="hs-row"><span>Projected total</span><b>${fmt(projTop.live)}</b></div>`
-      : `<div class="hs-row"><span>Projected to win</span><b>${projLabel} &mdash; ${fmt(projTop.live)}</b></div>`}
+    <table class="hs-table">
+      <thead><tr><th></th><th>Team</th><th>Proj</th><th>Left</th><th>Win%</th></tr></thead>
+      <tbody>${trs}</tbody>
+    </table>
   </div>`;
 }
 function renderStandings(){
