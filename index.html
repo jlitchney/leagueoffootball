@@ -51,7 +51,7 @@ button{cursor:pointer}
 
 .matchup-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
 .mm-btn{padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font:600 14px/1.2 var(--body);white-space:nowrap;flex-shrink:0;transition:background .15s,border-color .15s,color .15s}
-.mm-btn.active{background:var(--me);color:#1A1200;border-color:var(--me)}
+.mm-btn.active{background:var(--me);color:#fff;border-color:var(--me)}
 .mm-pick{flex:1;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);min-width:0;font:inherit;color:inherit}
 
 /* scoreboard header */
@@ -449,8 +449,9 @@ async function tick(){
   if (S.busy) return;
   S.busy = true; $('refresh').disabled = true;
   try {
-    const [m] = await Promise.all([j(`${SL}/league/${S.cfg.leagueId}/matchups/${S.week}`), loadGames(), loadProj(), loadFeed()]);
+    const [m, users] = await Promise.all([j(`${SL}/league/${S.cfg.leagueId}/matchups/${S.week}`), j(`${SL}/league/${S.cfg.leagueId}/users`), loadGames(), loadProj(), loadFeed()]);
     S.matchups = m;
+    S.users = Object.fromEntries(users.map(u => [u.user_id, u]));
     S.lastUpdate = Date.now();
     render();
   } catch (e) {
