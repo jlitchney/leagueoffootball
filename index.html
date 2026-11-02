@@ -253,7 +253,6 @@ button{cursor:pointer}
       <p class="note">
         Live projection = points so far + pregame projection × share of game left.
         Game clocks come from ESPN’s public scoreboard and projections from Sleeper; both are unofficial feeds.
-        <br><button class="icon" id="change" style="margin-top:8px">Change team</button>
       </p>
     </div>
     <div id="page-money" class="page hidden">
@@ -718,7 +717,6 @@ $('next').onclick = () => setWeek(S.week + 1);
 $('refresh').onclick = () => tick();
 $('matchupPick').onchange = e => { if (e.target.value) { S.sel = Number(e.target.value); render(); } };
 $('myMatchupBtn').onclick = () => { const p = pairs().find(pair => pair.some(m => m.roster_id === myRosterId())); if (p) { S.sel = p[0].matchup_id; render(); } };
-$('change').onclick = () => { store.del('sd_cfg'); clearTimeout(S.timer); S.cfg = {}; LEAGUE_ID ? pickTeam() : showSetup(); };
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) clearTimeout(S.timer);
   else if (S.cfg.leagueId && S.league) (Date.now() - S.lastUpdate > 30e3 ? tick() : schedule());
