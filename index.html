@@ -59,8 +59,7 @@ button{cursor:pointer}
 .bteam{min-width:0;position:relative;border-radius:10px;transition:box-shadow .25s}
 .bteam.r{text-align:right}
 .proj-win{box-shadow:0 0 0 2px var(--live)}
-.bwin{position:absolute;top:0;right:0;font:700 12px/1 var(--body);color:var(--live)}
-.bteam.r .bwin{right:auto;left:0}
+.bproj-pct{color:var(--live);font-weight:700}
 .bsc{font:800 44px/1 var(--display);letter-spacing:-.5px;font-variant-numeric:tabular-nums}
 .bsc .sd{font-size:22px;vertical-align:super;letter-spacing:0;font-weight:700}
 .bsc.a{color:var(--me)}
@@ -584,11 +583,10 @@ function teamBlock(t, side, winPct) {
   const pct = t.minTotal ? (t.minLeft / t.minTotal) * 100 : 0;
   const minsLabel = S.games ? `${Math.round(t.minLeft)} min left` : '';
   const winning = winPct != null && winPct > 0.5;
-  const badge = winning ? `<div class="bwin">${Math.round(winPct * 100)}%</div>` : '';
+  const pctLabel = winPct != null ? ` <span class="bproj-pct">· ${Math.round(winPct * 100)}%</span>` : '';
   return `<div class="bteam${side === 'b' ? ' r' : ''}${winning ? ' proj-win' : ''}">
-    ${badge}
     <div class="bsc ${cls}">${splitPts(t.points)}</div>
-    <div class="bproj">Proj <b>${fmt(t.live)}</b></div>
+    <div class="bproj">Proj <b>${fmt(t.live)}</b>${pctLabel}</div>
     <div class="bname">${esc(t.name)}</div>
     ${t.owner ? `<div class="bowner">${esc(t.owner)}</div>` : ''}
     ${t.record ? `<div class="brec">${esc(t.record)}</div>` : ''}
