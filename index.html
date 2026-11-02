@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E2418">
+<title>The League</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="The League">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Extra+Condensed:wght@600;800&family=Saira+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#E9EFE8; --surface:#F8FAF6; --line:#C9D6C9; --ink:#13281C; --muted:#5A6E60;
+  --me:#A86F00; --opp:#2F5F8F; --turf-soft:#D3E3D4; --tick:rgba(19,40,28,.18); --bad:#B23A2E; --live:#1F8A4C;
+  --display:"Saira Extra Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Saira Semi Condensed",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --bg:#0E2418; --surface:#143020; --line:#24432F; --ink:#E6EEE6; --muted:#93A898;
+    --me:#F2B33D; --opp:#8FB8E0; --turf-soft:#1B3B28; --tick:rgba(230,238,230,.16); --bad:#F08A7E; --live:#5BD68F;
+  }
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.4 var(--body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:640px;margin:0 auto;padding:12px 14px 40px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--me);outline-offset:2px}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.league{flex:1;min-width:0;font:600 17px/1.2 var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk{display:flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.wk button{background:none;border:0;width:34px;height:32px;font-size:18px;line-height:1}
+.wk span{font:600 15px var(--body);min-width:62px;text-align:center}
+.icon{background:var(--surface);border:1px solid var(--line);border-radius:999px;height:34px;padding:0 12px}
+
+select.pick{width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);margin-bottom:12px}
+
+/* scoreboard */
+.board{display:grid;grid-template-columns:1fr 1fr;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px}
+.team{min-width:0}
+.team.b{text-align:right}
+.tname{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score{font:800 56px/0.95 var(--display);letter-spacing:-.5px;margin-top:4px;font-variant-numeric:tabular-nums}
+.a .score{color:var(--me)} .b .score{color:var(--opp)}
+.proj{color:var(--muted);font-size:14px;margin-top:2px}
+.proj b{color:var(--ink);font-weight:600}
+.field{position:relative;height:14px;border-radius:3px;margin-top:10px;overflow:hidden;
+  background:
+    repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),var(--tick) calc(10% - 1px) 10%),
+    var(--turf-soft)}
+.field i{position:absolute;top:0;bottom:0;left:0;transition:width .6s ease}
+.a .field i{background:var(--me)}
+.b .field i{right:0;left:auto;background:var(--opp)}
+.mins{font-size:13px;color:var(--muted);margin-top:4px}
+.mins b{color:var(--ink);font-weight:600}
+.verdict{text-align:center;color:var(--muted);font-size:14px;margin:10px 0 4px}
+.verdict b{color:var(--ink)}
+
+/* lineup */
+.rows{margin-top:10px;border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 3.4rem 2.4rem 3.4rem minmax(0,1fr);align-items:center;gap:4px;padding:8px 0;border-bottom:1px solid var(--line)}
+.p{min-width:0}
+.p.r{text-align:right}
+.pn{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm .on{color:var(--live);font-weight:600}
+.inj{color:var(--bad);font-weight:600;font-size:12px;margin:0 3px}
+.pts{text-align:center;font-variant-numeric:tabular-nums}
+.pts .act{font:600 20px/1 var(--display)}
+.pts .lv{font-size:11px;color:var(--muted)}
+.pts.win .act{color:var(--ink)}
+.pts.lose .act{color:var(--muted)}
+.slot{text-align:center;font:600 12px var(--body);color:var(--muted);background:var(--turf-soft);border-radius:6px;padding:3px 0}
+.empty .pn{color:var(--muted);font-style:italic}
+
+.status{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);margin-top:14px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--live);margin-right:5px;vertical-align:1px}
+.note{font-size:12px;color:var(--muted);margin-top:18px;line-height:1.5}
+.msg{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.msg.err{border-color:var(--bad)}
+
+/* setup */
+.setup h1{font:800 44px/1 var(--display);margin:28px 0 6px;letter-spacing:-.3px}
+.setup p{color:var(--muted);margin:0 0 18px}
+.setup label{display:block;font-weight:600;margin-bottom:6px}
+.setup input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:16px}
+.primary{margin-top:12px;width:100%;padding:12px;border:0;border-radius:10px;background:var(--me);color:#1A1200;font-weight:600;font-size:16px}
+.choices{display:grid;gap:8px;margin-top:14px}
+.choices button{text-align:left;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+.choices small{display:block;color:var(--muted)}
+/* roasts */
+.roasts{margin-top:26px}
+.roasts h2{font:800 30px/1 var(--display);margin:0 0 8px;letter-spacing:-.2px}
+.alerts{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:14px}
+.alerts button{flex-shrink:0}
+.alertForm{display:grid;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.alertForm label{font-weight:600;font-size:14px}
+.alertForm input,.alertForm select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px}
+.feed{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.feed li{padding:10px 0;border-bottom:1px solid var(--line);white-space:pre-line}
+.feed b{display:block;font-weight:600}
+.feed time{font-size:12px;color:var(--muted)}
+/* champions: styled after the trophy's engraved plaques */
+.hall{margin-top:26px}
+.hall h2{font:800 30px/1 var(--display);margin:0 0 4px;letter-spacing:-.2px}
+.hall .sub{color:var(--muted);font-size:14px;margin:0 0 12px}
+.hall .sub b{color:var(--ink);font-weight:600}
+.plaques{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.plaque{background:#151515;color:#E2C27A;border:2px solid #C9A55A;border-radius:4px;padding:3px}
+.plaque div{border:1px solid rgba(201,165,90,.55);border-radius:2px;padding:7px 6px 8px;text-align:center}
+.plaque .yr{font:600 26px/1 Georgia,"Times New Roman",serif;letter-spacing:.5px}
+.plaque .tm{font:500 13px/1.25 Georgia,"Times New Roman",serif;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plaque .ow{font:400 13px/1.25 Georgia,"Times New Roman",serif;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plaque.reigning{border-color:#F0CE7A;box-shadow:0 0 0 2px var(--me)}
+.titles{margin:14px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.titles li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.titles .n{font:600 18px/1 var(--display);color:var(--me);white-space:nowrap}
+.titles small{display:block;color:var(--muted);font-size:12px}
+.hidden{display:none!important}
+@media (prefers-reduced-motion: reduce){.field i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section id="setup" class="setup hidden">
+    <h1>Sunday, live.</h1>
+    <p>Your Sleeper matchup with time left to play and projections that move with the game.</p>
+    <label for="who">Sleeper username or league ID</label>
+    <input id="who" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. jason123">
+    <button class="primary" id="go">Load my league</button>
+    <div id="setupMsg"></div>
+    <div id="choices" class="choices"></div>
+  </section>
+
+  <section id="app" class="hidden">
+    <div class="top">
+      <div class="league" id="leagueName"></div>
+      <div class="wk">
+        <button id="prev" aria-label="Previous week">‹</button>
+        <span id="wkLabel"></span>
+        <button id="next" aria-label="Next week">›</button>
+      </div>
+      <button class="icon" id="refresh" aria-label="Refresh now">↻</button>
+    </div>
+    <select class="pick" id="matchupPick" aria-label="Matchup"></select>
+    <div id="main"></div>
+    <div class="status"><span id="liveLbl"></span><span id="updated"></span></div>
+    <section class="roasts hidden" id="roasts">
+      <h2>Roasts</h2>
+      <div class="alerts" id="alerts"></div>
+      <div class="alertForm hidden" id="alertForm">
+        <label for="code">League code</label>
+        <input id="code" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <label for="alertTeam">Your team</label>
+        <select id="alertTeam"></select>
+        <button class="primary" id="enableAlerts">Turn on alerts</button>
+        <div id="alertErr"></div>
+      </div>
+      <ul class="feed" id="feed"></ul>
+    </section>
+    <section class="hall hidden" id="money"></section>
+    <section class="hall" id="hall"></section>
+    <p class="note">
+      Live projection = points so far + pregame projection × share of game left.
+      Game clocks come from ESPN’s public scoreboard and projections from Sleeper; both are unofficial feeds.
+      <br><button class="icon" id="change" style="margin-top:8px">Change league</button>
+    </p>
+  </section>
+
+</div>
+<script>
+/* Past champions, straight off the trophy. Add a line here each year. */
+const CHAMPIONS = [
+  { year: 2019, team: 'Andrew’s football team', owner: 'Andrew Litchney' },
+  { year: 2020, team: 'Andrew’s football team', owner: 'Andrew Litchney' },
+  { year: 2021, team: 'Your Mom',               owner: 'Grandma Angie' },
+  { year: 2022, team: 'Your Mom',               owner: 'Grandma Angie' },
+  { year: 2023, team: 'The Cheeseburger',       owner: 'Cambria Arashiro' },
+  { year: 2024, team: 'Gabby',                  owner: 'Gabby Swank' },
+  { year: 2025, team: 'Swift For The Win',      owner: 'Gabby Swank' },
+];
+
+/* Payouts. Weekly prize goes to the week's top score; ties split it. */
+const PAYOUTS = { weeklyHigh: 50, first: 170, second: 70, third: 50, weeklyThroughPlayoffs: false };
+
+/* Roast alerts: fill these in after deploying the worker (see SETUP.md). Leave blank to hide the section. */
+const PUSH = {
+  worker: '',          // e.g. 'https://league-bot.yourname.workers.dev'
+  vapidPublicKey: ''   // the public key from `npx web-push generate-vapid-keys`
+};
+
+const SL = 'https://api.sleeper.app/v1';
+const S = { cfg:{}, nfl:null, league:null, users:{}, rosters:[], players:{}, proj:null, projKey:'', projAt:0,
+            games:null, matchups:null, week:1, season:'', stype:'regular', sel:null, timer:null, busy:false, lastUpdate:0 };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => (Math.round((n || 0) * 10) / 10).toFixed(1);
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k){ try { localStorage.removeItem(k); } catch {} }
+};
+async function j(url){
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} from ${new URL(url).host}`);
+  return r.json();
+}
+const TEAM_FIX = { WSH:'WAS', JAC:'JAX', LA:'LAR' };
+const norm = t => TEAM_FIX[t] || t;
+const SLOT_LBL = { SUPER_FLEX:'SF', FLEX:'FLX', REC_FLEX:'W/T', WRRB_FLEX:'W/R', IDP_FLEX:'IDP', DEF:'DEF' };
+
+/* ---------- setup ---------- */
+function showSetup(msg){
+  $('app').classList.add('hidden'); $('setup').classList.remove('hidden');
+  $('choices').innerHTML = '';
+  $('setupMsg').innerHTML = msg ? `<div class="msg err">${esc(msg)}</div>` : '';
+}
+async function startSetup(){
+  const v = $('who').value.trim();
+  if (!v) return;
+  $('go').disabled = true; $('setupMsg').innerHTML = '<div class="msg">Looking that up…</div>'; $('choices').innerHTML = '';
+  try {
+    const nfl = await j(SL + '/state/nfl');
+    if (/^\d{12,}$/.test(v)) {
+      await chooseLeague(v, null);
+    } else {
+      const user = await j(SL + '/user/' + encodeURIComponent(v));
+      if (!user || !user.user_id) throw new Error(`No Sleeper user named “${v}”. Check the spelling.`);
+      const leagues = await j(`${SL}/user/${user.user_id}/leagues/nfl/${nfl.season}`);
+      if (!leagues.length) throw new Error(`${user.display_name} has no ${nfl.season} leagues.`);
+      if (leagues.length === 1) return chooseLeague(leagues[0].league_id, user.user_id);
+      $('setupMsg').innerHTML = '<p style="margin:16px 0 0">Pick a league:</p>';
+      $('choices').innerHTML = leagues.map(l =>
+        `<button data-l="${esc(l.league_id)}">${esc(l.name)}<small>${l.total_rosters} teams</small></button>`).join('');
+      $('choices').onclick = e => { const b = e.target.closest('button'); if (b) chooseLeague(b.dataset.l, user.user_id); };
+    }
+  } catch (e) {
+    $('setupMsg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+  } finally { $('go').disabled = false; }
+}
+async function chooseLeague(leagueId, userId){
+  if (userId) { S.cfg = { leagueId, userId }; store.set('sd_cfg', S.cfg); return boot(); }
+  // League ID only: ask which team is theirs
+  const [rosters, users] = await Promise.all([j(`${SL}/league/${leagueId}/rosters`), j(`${SL}/league/${leagueId}/users`)]);
+  const byId = Object.fromEntries(users.map(u => [u.user_id, u]));
+  $('setupMsg').innerHTML = '<p style="margin:16px 0 0">Which team is yours?</p>';
+  $('choices').innerHTML = rosters.map(r => {
+    const u = byId[r.owner_id];
+    return `<button data-r="${r.roster_id}">${esc(u?.metadata?.team_name || u?.display_name || 'Team ' + r.roster_id)}<small>${esc(u?.display_name || '')}</small></button>`;
+  }).join('');
+  $('choices').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    S.cfg = { leagueId, rosterId: Number(b.dataset.r) }; store.set('sd_cfg', S.cfg); boot();
+  };
+}
+
+/* ---------- data ---------- */
+async function loadPlayers(){
+  const c = store.get('sd_players', null);
+  if (c && Date.now() - c.t < 864e5) { S.players = c.d; return; }
+  const raw = await j(SL + '/players/nfl');   // ~5 MB, so cached for a day
+  const d = {};
+  for (const [id, p] of Object.entries(raw)) {
+    const pos = p.position || (p.fantasy_positions || [])[0];
+    if (!pos || (!p.team && !p.active)) continue;
+    const name = pos === 'DEF' ? `${p.last_name} D/ST`
+      : (p.first_name && p.last_name ? `${p.first_name[0]}. ${p.last_name}` : (p.full_name || id));
+    d[id] = [name, pos, pos === 'DEF' ? id : (p.team || null), p.injury_status || null];
+  }
+  S.players = d;
+  store.set('sd_players', { t: Date.now(), d });
+}
+
+async function loadProj(){
+  const key = `${S.season}-${S.week}`;
+  if (S.projKey === key && Date.now() - S.projAt < 30 * 60e3) return;
+  const pos = ['QB','RB','WR','TE','K','DEF'].map(p => 'position[]=' + p).join('&');
+  try {
+    const arr = await j(`https://api.sleeper.com/projections/nfl/${S.season}/${S.week}?season_type=${S.stype}&${pos}`);
+    const rec = S.league?.scoring_settings?.rec ?? 1;
+    const field = rec >= 1 ? 'pts_ppr' : rec >= 0.5 ? 'pts_half_ppr' : 'pts_std';
+    const out = {};
+    for (const r of arr) if (r && r.player_id && r.stats) {
+      const v = r.stats[field] ?? r.stats.pts_ppr;
+      if (typeof v === 'number') out[r.player_id] = v;
+    }
+    S.proj = out;
+  } catch { S.proj = null; }
+  S.projKey = key; S.projAt = Date.now();
+}
+
+async function loadGames(){
+  const st = S.stype === 'post' ? 3 : S.stype === 'pre' ? 1 : 2;
+  try {
+    const d = await j(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${S.season}&seasontype=${st}&week=${S.week}`);
+    const g = {};
+    for (const ev of d.events || []) {
+      const c = ev.competitions?.[0]; if (!c) continue;
+      const s = c.status || ev.status, state = s.type.state, p = s.period || 0, clock = s.displayClock || '0:00';
+      let min, detail;
+      if (state === 'pre') {
+        min = 60;
+        detail = new Date(ev.date).toLocaleString([], { weekday:'short', hour:'numeric', minute:'2-digit' });
+      } else if (state === 'post') {
+        min = 0; detail = 'Final';
+      } else {
+        const [m, sec] = clock.split(':').map(Number);
+        const cm = (m || 0) + (sec || 0) / 60;
+        min = p <= 4 ? (4 - p) * 15 + cm : cm;
+        detail = s.type.name === 'STATUS_HALFTIME' ? 'Half' : (p <= 4 ? `Q${p} ${clock}` : `OT ${clock}`);
+      }
+      const teams = c.competitors.map(x => ({ t: norm(x.team.abbreviation), home: x.homeAway === 'home' }));
+      for (const me of teams) {
+        const opp = teams.find(x => x !== me);
+        g[me.t] = { state, min, detail, vs: opp ? (me.home ? 'vs ' : '@ ') + opp.t : '' };
+      }
+    }
+    S.games = g;
+  } catch { S.games = null; }
+}
+
+async function tick(){
+  if (S.busy) return;
+  S.busy = true; $('refresh').disabled = true;
+  try {
+    const [m] = await Promise.all([j(`${SL}/league/${S.cfg.leagueId}/matchups/${S.week}`), loadGames(), loadProj(), loadFeed()]);
+    S.matchups = m;
+    S.lastUpdate = Date.now();
+    render();
+  } catch (e) {
+    $('main').innerHTML = `<div class="msg err">Couldn’t reach Sleeper (${esc(e.message)}). It will retry automatically.</div>`;
+  } finally {
+    S.busy = false; $('refresh').disabled = false; schedule();
+  }
+}
+function schedule(){
+  clearTimeout(S.timer);
+  if (document.hidden) return;
+  const live = S.games && Object.values(S.games).some(g => g.state === 'in');
+  S.timer = setTimeout(tick, live ? 45e3 : 5 * 60e3);
+}
+
+/* ---------- render ---------- */
+function teamName(rid){
+  const r = S.rosters.find(x => x.roster_id === rid);
+  const u = r && S.users[r.owner_id];
+  return u ? (u.metadata?.team_name || u.display_name) : 'Team ' + rid;
+}
+function myRosterId(){
+  if (S.cfg.rosterId) return S.cfg.rosterId;
+  const r = S.rosters.find(x => x.owner_id === S.cfg.userId || (x.co_owners || []).includes(S.cfg.userId));
+  return r ? r.roster_id : null;
+}
+function slotLabels(){
+  return (S.league.roster_positions || []).filter(p => !['BN','IR','TAXI'].includes(p)).map(p => SLOT_LBL[p] || p);
+}
+function side(m){
+  const slots = slotLabels();
+  const rows = (m.starters || []).map((pid, i) => {
+    if (!pid || pid === '0') return { empty:true, slot:slots[i] || '', pts:0, live:0, min:0 };
+    const info = S.players[pid] || [pid, '', null, null];
+    const team = info[2];
+    const pts = (m.starters_points || [])[i] ?? m.players_points?.[pid] ?? 0;
+    const proj = S.proj ? (S.proj[pid] ?? 0) : null;
+    let game = null, min = null;
+    if (S.games) { game = S.games[team] || null; min = game ? game.min : 0; }
+    let live;
+    if (proj == null) live = pts;
+    else if (min == null) live = pts > 0 ? pts : proj;
+    else live = pts + proj * (min / 60);
+    return { pid, slot:slots[i] || info[1], name:info[0], team, inj:info[3], pts, proj, live, min, game };
+  });
+  const filled = rows.filter(r => !r.empty);
+  return {
+    name: teamName(m.roster_id), rows,
+    points: m.points ?? filled.reduce((a, r) => a + r.pts, 0),
+    live: rows.reduce((a, r) => a + r.live, 0),
+    minLeft: rows.reduce((a, r) => a + (r.min || 0), 0),
+    minTotal: filled.length * 60,
+    yet: filled.filter(r => r.game?.state === 'pre').length,
+    now: filled.filter(r => r.game?.state === 'in').length
+  };
+}
+function pairs(){
+  const map = {};
+  for (const m of S.matchups || []) if (m.matchup_id != null) (map[m.matchup_id] ||= []).push(m);
+  const mine = myRosterId();
+  return Object.values(map).map(p => {
+    p.sort((x, y) => (y.roster_id === mine) - (x.roster_id === mine));
+    return p;
+  });
+}
+function meta(r){
+  const inj = r.inj && r.inj !== 'Active' ? `<span class="inj">${esc(r.inj === 'Questionable' ? 'Q' : r.inj === 'Doubtful' ? 'D' : r.inj === 'Out' ? 'O' : r.inj)}</span>` : '';
+  if (!S.games) return `${esc(r.team || '')}${inj}`;
+  if (!r.game) return `${esc(r.team || 'FA')}, no game${inj}`;
+  const g = r.game;
+  if (g.state === 'in') return `${esc(r.team)} <span class="on">${esc(g.detail)}</span>${inj}`;
+  if (g.state === 'pre') return `${esc(r.team)} ${esc(g.vs)}, ${esc(g.detail)}${inj}`;
+  return `${esc(r.team)}, final${inj}`;
+}
+function playerCell(r, right){
+  if (!r) return `<div class="p${right ? ' r' : ''}"></div>`;
+  if (r.empty) return `<div class="p empty${right ? ' r' : ''}"><div class="pn">Empty</div><div class="pm">&nbsp;</div></div>`;
+  return `<div class="p${right ? ' r' : ''}"><div class="pn">${esc(r.name)}</div><div class="pm">${meta(r)}</div></div>`;
+}
+function ptsCell(r, other){
+  if (!r) return '<div class="pts"></div>';
+  const cls = other ? (r.pts > other.pts ? 'win' : r.pts < other.pts ? 'lose' : '') : '';
+  const lv = r.empty || r.proj == null || r.game?.state === 'post' ? '' : fmt(r.live);
+  return `<div class="pts ${cls}"><div class="act">${fmt(r.pts)}</div><div class="lv">${lv || '&nbsp;'}</div></div>`;
+}
+function teamBlock(t, cls){
+  const pct = t.minTotal ? (t.minLeft / t.minTotal) * 100 : 0;
+  const mins = S.games
+    ? `<b>${Math.round(t.minLeft)}</b> of ${t.minTotal} min left`
+    : 'Game clocks unavailable';
+  return `<div class="team ${cls}">
+    <div class="tname">${esc(t.name)}</div>
+    <div class="score">${fmt(t.points)}</div>
+    <div class="proj">Projected <b>${fmt(t.live)}</b></div>
+    <div class="field" role="img" aria-label="${Math.round(pct)}% of game time left"><i style="width:${pct}%"></i></div>
+    <div class="mins">${mins}</div>
+  </div>`;
+}
+function render(){
+  const ps = pairs();
+  const pick = $('matchupPick');
+  if (!ps.length) {
+    pick.classList.add('hidden');
+    $('main').innerHTML = `<div class="msg">No matchups for week ${S.week} yet.</div>`;
+    return;
+  }
+  pick.classList.remove('hidden');
+  const mine = myRosterId();
+  if (S.sel == null || !ps.some(p => p[0].matchup_id === S.sel)) {
+    S.sel = (ps.find(p => p.some(m => m.roster_id === mine)) || ps[0])[0].matchup_id;
+  }
+  pick.innerHTML = ps.map(p => `<option value="${p[0].matchup_id}" ${p[0].matchup_id === S.sel ? 'selected' : ''}>${esc(teamName(p[0].roster_id))} vs ${esc(p[1] ? teamName(p[1].roster_id) : 'bye')}</option>`).join('');
+
+  const pair = ps.find(p => p[0].matchup_id === S.sel);
+  const A = side(pair[0]), B = pair[1] ? side(pair[1]) : null;
+
+  let verdict = '';
+  if (B) {
+    const diff = A.live - B.live, isMine = pair[0].roster_id === mine;
+    const leader = diff >= 0 ? A : B;
+    verdict = Math.abs(diff) < 0.05 ? 'Projected dead even'
+      : isMine ? (diff > 0 ? `You’re projected to win by <b>${fmt(diff)}</b>` : `You’re projected to lose by <b>${fmt(-diff)}</b>`)
+      : `${esc(leader.name)} projected by <b>${fmt(Math.abs(diff))}</b>`;
+    if (S.games) verdict += `<br>${A.now + A.yet ? `${A.now} playing, ${A.yet} yet to play` : 'All done'} vs ${B.now + B.yet ? `${B.now} playing, ${B.yet} yet to play` : 'all done'}`;
+  }
+
+  const n = Math.max(A.rows.length, B ? B.rows.length : 0);
+  let rows = '';
+  for (let i = 0; i < n; i++) {
+    const a = A.rows[i], b = B?.rows[i];
+    rows += `<div class="row">${playerCell(a)}${ptsCell(a, b)}<div class="slot">${esc(a?.slot || b?.slot || '')}</div>${ptsCell(b, a)}${playerCell(b, true)}</div>`;
+  }
+
+  $('main').innerHTML = `
+    <section class="board">${teamBlock(A, 'a')}${B ? teamBlock(B, 'b') : '<div class="team b"><div class="tname">Bye</div></div>'}</section>
+    ${verdict ? `<div class="verdict">${verdict}</div>` : ''}
+    <div class="rows">${rows}</div>
+    ${S.proj ? '' : '<div class="msg">Projections didn’t load, so projected totals show points scored only.</div>'}
+    ${S.games ? '' : '<div class="msg">Game clocks didn’t load from ESPN, so minutes left aren’t shown. It will retry.</div>'}`;
+  updateStatus();
+  renderMoney();
+}
+function updateStatus(){
+  const live = S.games && Object.values(S.games).some(g => g.state === 'in');
+  $('liveLbl').innerHTML = live ? '<span class="dot"></span>Games in progress, refreshing every 45s' : 'Refreshing every 5 min';
+  if (!S.lastUpdate) return;
+  const s = Math.round((Date.now() - S.lastUpdate) / 1000);
+  $('updated').textContent = s < 10 ? 'Updated just now' : s < 60 ? `Updated ${s}s ago` : `Updated ${Math.round(s / 60)} min ago`;
+}
+function setWeek(w){
+  S.week = Math.max(1, Math.min(18, w));
+  $('wkLabel').textContent = 'Week ' + S.week;
+  S.sel = null; S.matchups = null;
+  $('main').innerHTML = '<div class="msg">Loading…</div>';
+  tick();
+}
+
+/* ---------- boot ---------- */
+async function boot(){
+  $('setup').classList.add('hidden'); $('app').classList.remove('hidden');
+  $('main').innerHTML = '<div class="msg">Loading your league… (first load grabs the player list, about 5 MB)</div>';
+  try {
+    const id = S.cfg.leagueId;
+    const [nfl, league, users, rosters] = await Promise.all([
+      j(SL + '/state/nfl'), j(`${SL}/league/${id}`), j(`${SL}/league/${id}/users`), j(`${SL}/league/${id}/rosters`), loadPlayers()
+    ]);
+    if (!league) throw new Error('That league ID wasn’t found.');
+    S.nfl = nfl; S.league = league; S.rosters = rosters;
+    S.users = Object.fromEntries(users.map(u => [u.user_id, u]));
+    S.season = league.season || nfl.season;
+    S.stype = nfl.season_type === 'post' ? 'post' : 'regular';
+    $('leagueName').textContent = league.name;
+    setWeek(nfl.season_type === 'pre' ? 1 : (nfl.display_week || nfl.week || 1));
+    loadMoney();
+  } catch (e) {
+    showSetup(`Couldn’t load the league: ${e.message}`);
+  }
+}
+
+$('go').onclick = startSetup;
+$('who').addEventListener('keydown', e => { if (e.key === 'Enter') startSetup(); });
+$('prev').onclick = () => setWeek(S.week - 1);
+$('next').onclick = () => setWeek(S.week + 1);
+$('refresh').onclick = () => tick();
+$('matchupPick').onchange = e => { S.sel = Number(e.target.value); render(); };
+$('change').onclick = () => { store.del('sd_cfg'); clearTimeout(S.timer); S.cfg = {}; showSetup(); };
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearTimeout(S.timer);
+  else if (S.cfg.leagueId && S.league) (Date.now() - S.lastUpdate > 30e3 ? tick() : schedule());
+});
+setInterval(updateStatus, 5e3);
+
+function renderHall(){
+  const list = [...CHAMPIONS].sort((a, b) => b.year - a.year);
+  if (!list.length) return;
+  const champ = list[0];
+  // title counts and best streak per owner
+  const by = {};
+  for (const c of [...list].reverse()) {
+    const o = (by[c.owner] ||= { owner: c.owner, years: [], best: 0, run: 0, last: null });
+    o.run = o.last === c.year - 1 ? o.run + 1 : 1;
+    o.best = Math.max(o.best, o.run); o.last = c.year; o.years.push(c.year);
+  }
+  const owners = Object.values(by).sort((a, b) => b.years.length - a.years.length || Math.max(...b.years) - Math.max(...a.years));
+  const yrs = o => o.years.map(y => "’" + String(y).slice(2)).join(', ');
+  $('hall').innerHTML = `
+    <h2>Champions</h2>
+    <p class="sub">Reigning: <b>${esc(champ.owner)}</b>, ${esc(champ.team)} (${champ.year})</p>
+    <div class="plaques">${list.map((c, i) => `
+      <div class="plaque${i === 0 ? ' reigning' : ''}"><div>
+        <div class="yr">${c.year}</div>
+        <div class="tm">${esc(c.team)}</div>
+        <div class="ow">${esc(c.owner)}</div>
+      </div></div>`).join('')}
+    </div>
+    <ul class="titles">${owners.map(o => `
+      <li><span>${esc(o.owner)}<small>${yrs(o)}${o.best >= 2 ? `, ${o.best === 2 ? 'back-to-back' : o.best + ' straight'}` : ''}</small></span>
+      <span class="n">${o.years.length} ${o.years.length === 1 ? 'title' : 'titles'}</span></li>`).join('')}
+    </ul>`;
+}
+renderHall();
+
+/* ---------- roast alerts + feed ---------- */
+const pushReady = () => !!(PUSH.worker && PUSH.vapidPublicKey);
+const workerUrl = path => PUSH.worker.replace(/\/$/, '') + path;
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const standalone = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+const canPush = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+let swReg = null;
+function b64u(s){
+  const b = atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(b, c => c.charCodeAt(0));
+}
+async function initPush(){
+  if (!pushReady()) return;
+  $('roasts').classList.remove('hidden');
+  if ('serviceWorker' in navigator) {
+    try { swReg = await navigator.serviceWorker.register('./sw.js'); } catch (e) { console.warn('Service worker failed', e); }
+  }
+  renderAlerts();
+}
+async function currentSub(){
+  try { return swReg ? await swReg.pushManager.getSubscription() : null; } catch { return null; }
+}
+async function renderAlerts(){
+  const box = $('alerts');
+  if (!canPush()) {
+    box.innerHTML = isIOS && !standalone()
+      ? '<span>For roast alerts, tap Share, then Add to Home Screen, and open The League from your home screen.</span>'
+      : '<span>This browser doesn’t support notifications.</span>';
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    box.innerHTML = '<span>Notifications are blocked for this app. Turn them on in Settings, then reopen it.</span>';
+    return;
+  }
+  const sub = await currentSub();
+  box.innerHTML = sub
+    ? '<span><span class="dot"></span>Roast alerts are on</span><button class="icon" id="alertOff">Turn off</button>'
+    : '<span>Get a notification whenever someone gets roasted.</span><button class="icon" id="alertOn">Turn on</button>';
+  if (sub) $('alertOff').onclick = disableAlerts;
+  else $('alertOn').onclick = openAlertForm;
+}
+function openAlertForm(){
+  const mine = S.league ? myRosterId() : null;
+  $('alertTeam').innerHTML = S.rosters.map(r =>
+    `<option value="${r.roster_id}" ${r.roster_id === mine ? 'selected' : ''}>${esc(teamName(r.roster_id))}</option>`).join('');
+  $('alertErr').innerHTML = '';
+  $('alertForm').classList.remove('hidden');
+}
+async function enableAlerts(){
+  const btn = $('enableAlerts');
+  btn.disabled = true; $('alertErr').innerHTML = '';
+  try {
+    // iOS requires this to be the first thing that happens after the tap
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error('Notifications weren’t allowed, so alerts are still off.');
+    const reg = swReg || await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(PUSH.vapidPublicKey) });
+    const r = S.rosters.find(x => x.roster_id === Number($('alertTeam').value));
+    const res = await fetch(workerUrl('/subscribe'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: $('code').value, subscription: sub.toJSON(), ownerId: r?.owner_id || '', name: r ? teamName(r.roster_id) : '' })
+    });
+    if (!res.ok) {
+      await sub.unsubscribe();
+      throw new Error(res.status === 403 ? 'That league code isn’t right.' : `Couldn’t save alerts (error ${res.status}). Try again.`);
+    }
+    $('alertForm').classList.add('hidden');
+  } catch (e) {
+    $('alertErr').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; renderAlerts();
+  }
+}
+async function disableAlerts(){
+  const sub = await currentSub();
+  if (sub) {
+    try { await fetch(workerUrl('/unsubscribe'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) }); } catch {}
+    await sub.unsubscribe();
+  }
+  renderAlerts();
+}
+async function loadFeed(){
+  if (!pushReady()) return;
+  try {
+    const items = await j(workerUrl('/feed'));
+    $('feed').innerHTML = items.length
+      ? items.slice(0, 12).map(i => `<li><b>${esc(i.title)}</b>${esc(i.body)}<br><time>${ago(i.at)}</time></li>`).join('')
+      : '<li>No roasts yet. They start once games kick off.</li>';
+  } catch {}
+}
+function ago(t){
+  const s = (Date.now() - t) / 1000;
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  if (s < 86400) return Math.round(s / 3600) + ' hr ago';
+  return new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+/* ---------- money ---------- */
+const M = { season: null, weeks: {}, bracket: null, done: 0, lastWeek: 14 };
+const usd = n => '$' + (Number.isInteger(n) ? n : n.toFixed(2));
+async function loadMoney(){
+  if (!S.league || !S.nfl) return;
+  const lastWeek = PAYOUTS.weeklyThroughPlayoffs ? 17 : ((S.league.settings?.playoff_week_start || 15) - 1);
+  const pastSeason = String(S.season) !== String(S.nfl.season);
+  const done = pastSeason ? lastWeek : Math.min(lastWeek, S.nfl.season_type === 'pre' ? 0 : (S.nfl.week || 1) - 1);
+  if (M.season !== S.season) { M.season = S.season; M.weeks = {}; }
+  const need = [];
+  for (let w = 1; w <= done; w++) if (!M.weeks[w]) need.push(w);
+  await Promise.all(need.map(async w => { try { M.weeks[w] = await j(`${SL}/league/${S.cfg.leagueId}/matchups/${w}`); } catch {} }));
+  try { M.bracket = await j(`${SL}/league/${S.cfg.leagueId}/winners_bracket`); } catch { M.bracket = null; }
+  M.done = done; M.lastWeek = lastWeek; M.pastSeason = pastSeason;
+  renderMoney();
+}
+function renderMoney(){
+  if (M.season == null) return;
+  const won = {};
+  const add = (rid, amt, label, kind) => {
+    const o = (won[rid] ||= { amt: 0, weeks: [], places: [] });
+    o.amt += amt; (kind === 'w' ? o.weeks : o.places).push(label);
+  };
+  for (let w = 1; w <= M.done; w++) {
+    const ms = M.weeks[w]; if (!ms?.length) continue;
+    const top = Math.max(...ms.map(m => m.points || 0)); if (!top) continue;
+    const winners = ms.filter(m => (m.points || 0) === top);
+    for (const m of winners) add(m.roster_id, PAYOUTS.weeklyHigh / winners.length, w, 'w');
+  }
+  const br = M.bracket || [];
+  const final = br.find(x => x.p === 1 && x.w), third = br.find(x => x.p === 3 && x.w);
+  if (final) { add(final.w, PAYOUTS.first, '1st place'); add(final.l, PAYOUTS.second, '2nd place'); }
+  if (third) add(third.w, PAYOUTS.third, '3rd place');
+
+  // live race for this week's prize
+  let pace = '';
+  const thisWeek = !M.pastSeason && S.week === (S.nfl?.week || 0) && S.week <= M.lastWeek;
+  if (thisWeek && S.matchups?.length) {
+    const top = Math.max(...S.matchups.map(m => m.points || 0));
+    if (top > 0) {
+      const leaders = S.matchups.filter(m => (m.points || 0) === top).map(m => esc(teamName(m.roster_id))).join(' and ');
+      pace = `<p class="sub">Week ${S.week}’s ${usd(PAYOUTS.weeklyHigh)}: <b>${leaders}</b> leads with ${fmt(top)}</p>`;
+    }
+  }
+  const rows = Object.entries(won).sort((a, b) => b[1].amt - a[1].amt).map(([rid, o]) => {
+    const bits = [];
+    if (o.weeks.length) bits.push(`${o.weeks.length === 1 ? 'Week' : 'Weeks'} ${o.weeks.join(', ')}`);
+    bits.push(...o.places);
+    return `<li><span>${esc(teamName(Number(rid)))}<small>${bits.join(', ')}</small></span><span class="n">${usd(o.amt)}</span></li>`;
+  }).join('');
+  $('money').innerHTML = `
+    <h2>Money</h2>
+    <p class="sub">${usd(PAYOUTS.weeklyHigh)} to each week’s top score through week ${M.lastWeek}. ${usd(PAYOUTS.first)}, ${usd(PAYOUTS.second)} and ${usd(PAYOUTS.third)} to the top three.</p>
+    ${pace}
+    ${rows ? `<ul class="titles">${rows}</ul>` : '<p class="sub">No weekly prizes paid yet.</p>'}`;
+  $('money').classList.remove('hidden');
+}
+
+$('enableAlerts').onclick = enableAlerts;
+initPush();
+
+S.cfg = store.get('sd_cfg', {});
+if (S.cfg.leagueId) boot(); else showSetup();
+</script>
+</body>
+</html>
