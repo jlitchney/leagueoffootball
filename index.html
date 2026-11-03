@@ -45,7 +45,9 @@ button{cursor:pointer}
 .matchup-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
 .mm-btn{padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font:600 14px/1.2 var(--body);white-space:nowrap;flex-shrink:0;transition:background .15s,border-color .15s,color .15s}
 .mm-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.mm-pick{flex:1;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);min-width:0;font:inherit;color:inherit}
+.mdots{display:flex;gap:6px;align-items:center;flex:1;justify-content:flex-end}
+.mdot{width:7px;height:7px;border-radius:50%;background:var(--line);cursor:pointer;transition:all .2s;flex-shrink:0}
+.mdot.active{width:22px;border-radius:4px;background:var(--accent)}
 
 /* scoreboard header */
 .board{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 14px 14px}
@@ -280,7 +282,7 @@ button{cursor:pointer}
       </div>
       <div class="matchup-bar hidden" id="matchupBar">
         <button class="mm-btn" id="myMatchupBtn">My Matchup</button>
-        <select class="mm-pick" id="matchupPick" aria-label="Other matchups"></select>
+        <div class="mdots" id="matchupDots"></div>
       </div>
       <div id="main"></div>
       <div id="hs-race"></div>
@@ -717,7 +719,7 @@ function h2hRecord(ridA, ridB) {
 }
 function render(){
   const ps = pairs();
-  const bar = $('matchupBar'), pick = $('matchupPick');
+  const bar = $('matchupBar'), dots = $('matchupDots');
   if (!ps.length) {
     bar.classList.add('hidden');
     $('main').innerHTML = `<div class="msg">No matchups for week ${S.week} yet.</div>`;
@@ -733,9 +735,12 @@ function render(){
   const btn = $('myMatchupBtn');
   btn.classList.toggle('hidden', !myPair);
   btn.classList.toggle('active', isMine);
-  const others = myPair ? ps.filter(p => p[0].matchup_id !== myPair[0].matchup_id) : ps;
-  pick.innerHTML = `<option value="" disabled${isMine ? ' selected' : ''}>Other matchups…</option>` +
-    others.map(p => `<option value="${p[0].matchup_id}"${p[0].matchup_id === S.sel ? ' selected' : ''}>${esc(teamName(p[0].roster_id))} vs ${esc(p[1] ? teamName(p[1].roster_id) : 'Bye')}</option>`).join('');
+  dots.innerHTML = ps.map(p =>
+    `<span class="mdot${p[0].matchup_id === S.sel ? ' active' : ''}" data-mid="${p[0].matchup_id}"></span>`
+  ).join('');
+  dots.querySelectorAll('.mdot').forEach(d => {
+    d.onclick = () => { S.sel = Number(d.dataset.mid); render(); };
+  });
 
   const pair = ps.find(p => p[0].matchup_id === S.sel);
   const A = side(pair[0]), B = pair[1] ? side(pair[1]) : null;
@@ -837,8 +842,20 @@ $('who').addEventListener('keydown', e => { if (e.key === 'Enter') startSetup();
 $('prev').onclick = () => setWeek(S.week - 1);
 $('next').onclick = () => setWeek(S.week + 1);
 $('refresh').onclick = () => tick();
-$('matchupPick').onchange = e => { if (e.target.value) { S.sel = Number(e.target.value); render(); } };
 $('myMatchupBtn').onclick = () => { const p = pairs().find(pair => pair.some(m => m.roster_id === myRosterId())); if (p) { S.sel = p[0].matchup_id; render(); } };
+let _tx0 = 0, _ty0 = 0;
+$('main').addEventListener('touchstart', e => { _tx0 = e.touches[0].clientX; _ty0 = e.touches[0].clientY; }, { passive: true });
+$('main').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - _tx0;
+  const dy = e.changedTouches[0].clientY - _ty0;
+  if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+  const ps = pairs();
+  if (!ps.length) return;
+  const idx = ps.findIndex(p => p[0].matchup_id === S.sel);
+  const next = dx < 0 ? (idx + 1) % ps.length : (idx - 1 + ps.length) % ps.length;
+  S.sel = ps[next][0].matchup_id;
+  render();
+}, { passive: true });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) clearTimeout(S.timer);
   else if (S.cfg.leagueId && S.league) (Date.now() - S.lastUpdate > 30e3 ? tick() : schedule());
