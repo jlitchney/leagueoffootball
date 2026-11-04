@@ -325,7 +325,19 @@ button{cursor:pointer}
     <p>Sign in to see your matchup.</p>
     <div id="loginBox">
       <label for="loginUser">Your team</label>
-      <select id="loginUser" style="font-size:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)"><option value="">Loading teams…</option></select>
+      <select id="loginUser" style="font-size:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)">
+        <option value="">Pick your team…</option>
+        <option>67MasterOogway</option>
+        <option>EvilGooberGibbs</option>
+        <option>GrandmaAngie1</option>
+        <option>I didnt hear no bell</option>
+        <option>LEGENDARY WILHELM</option>
+        <option>Lloyd Christmas</option>
+        <option>MERICATHEGREAT</option>
+        <option>My team sucks😭😭😭</option>
+        <option>Sneakypeeky</option>
+        <option>This name helps me win</option>
+      </select>
       <label for="loginPw">Password</label>
       <input id="loginPw" type="password" autocomplete="current-password" placeholder="Password" style="font-size:16px">
       <button class="primary" id="loginBtn">Sign in</button>
@@ -484,29 +496,9 @@ function optimalScore(m) {
 }
 
 /* ---------- setup ---------- */
-async function populateTeamSelect() {
-  const sel = $(‘loginUser’);
-  if (!sel || sel.options.length > 1) return;
-  try {
-    const [users, rosters] = await Promise.all([
-      j(SL + ‘/league/’ + LEAGUE_ID + ‘/users’),
-      j(SL + ‘/league/’ + LEAGUE_ID + ‘/rosters’)
-    ]);
-    const userMap = Object.fromEntries(users.map(u => [u.user_id, u]));
-    const teams = rosters.map(r => {
-      const u = userMap[r.owner_id] || {};
-      return r.metadata?.team_name || u.metadata?.team_name || u.display_name || (‘Team ‘ + r.roster_id);
-    }).sort((a, b) => a.localeCompare(b));
-    sel.innerHTML = ‘<option value=””>Pick your team…</option>’ +
-      teams.map(t => ‘<option value=”’ + esc(t) + ‘”>’ + esc(t) + ‘</option>’).join(‘’);
-  } catch {
-    sel.innerHTML = ‘<option value=””>Couldn\’t load teams — type your team name</option>’;
-  }
-}
 function showLogin(msg) {
   $(‘app’).classList.add(‘hidden’); $(‘setup’).classList.remove(‘hidden’);
   if ($(‘loginMsg’)) $(‘loginMsg’).innerHTML = msg ? ‘<div class=”msg err”>’ + esc(msg) + ‘</div>’ : ‘’;
-  populateTeamSelect();
 }
 async function doLogin() {
   const usernameEl = $(‘loginUser’), pwEl = $(‘loginPw’), btn = $(‘loginBtn’);
@@ -1848,7 +1840,6 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => showTab(t.datas
 try {
   S.cfg = store.get('sd_cfg', {});
   if (store.get('sd_token', '') && S.cfg.leagueId) boot();
-  else { populateTeamSelect(); }
 } catch (e) { /* login form already visible by default */ }
 
 if (location.hash === '#roasts') {
