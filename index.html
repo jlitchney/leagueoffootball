@@ -150,8 +150,16 @@ button{cursor:pointer}
 .cinput{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:14px;font-family:var(--body);flex:1;min-width:0}
 .ctextarea{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:14px;font-family:var(--body);resize:none;box-sizing:border-box}
 .cform-send{display:flex;justify-content:flex-end;margin-top:5px}
-.csend{padding:7px 14px;border-radius:8px;border:0;background:var(--accent);color:#fff;font:600 13px/1 var(--body)}
-.csend:disabled{opacity:.4}
+.csend{width:32px;height:32px;border-radius:50%;border:0;background:#007AFF;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;cursor:pointer}
+.csend:disabled{opacity:.35}
+.rxns{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.rxn-pill{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:13px;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:3px}
+.rxn-pill.mine{background:rgba(0,122,255,.1);border-color:rgba(0,122,255,.35)}
+.rxn-add{background:none;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:13px;cursor:pointer;color:var(--muted)}
+.rxn-picker{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:5px 8px;margin-top:5px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+.rxn-picker.hidden{display:none}
+.rxn-opt{font-size:22px;padding:3px 5px;border-radius:8px;cursor:pointer;border:0;background:none}
+.rxn-opt:hover,.rxn-opt:active{background:var(--turf-soft)}
 /* champions: styled after the trophy's engraved plaques */
 .hall{margin-top:26px}
 .hall h2{font:800 30px/1 var(--display);margin:0 0 4px;letter-spacing:-.2px}
@@ -1159,7 +1167,7 @@ async function loadFeed(){
               ) +
               '<div style="display:flex;gap:6px;align-items:flex-end;margin-top:6px">' +
                 '<textarea class="ctextarea" id="cb-' + iid + '" placeholder="Message..." rows="1" maxlength="500" style="flex:1"></textarea>' +
-                '<button class="csend" onclick="submitComment(\'' + iid + '\')" id="cs-' + iid + '">Send</button>' +
+                '<button class="csend" onclick="submitComment(\'' + iid + '\')" id="cs-' + iid + '" aria-label="Send">' + SEND_ICON + '</button>' +
               '</div>' +
             '</div>' +
             '</div>';
@@ -1176,6 +1184,8 @@ function ago(t){
   if (s < 86400) return Math.round(s / 3600) + ' hr ago';
   return new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
+const SEND_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5,12 12,5 19,12"/></svg>';
+const RXN_EMOJIS = ['❤️', '👍', '😂', '🔥', '💀', '👎'];
 async function loadComments(itemId) {
   try {
     const comments = await j(workerUrl('/comments/' + itemId));
@@ -1185,18 +1195,52 @@ async function loadComments(itemId) {
 function renderCommentList(itemId, comments) {
   const el = document.getElementById('cco-' + itemId);
   if (!el || !comments.length) return;
+  const myName = store.get('sd_cname', '') || teamName(myRosterId()) || '';
   let html = '';
   for (const c of comments) {
     const initials = c.ai ? 'R' : c.name.trim().slice(0, 2).toUpperCase();
+    const rxns = c.reactions || {};
+    const rxnKeys = Object.keys(rxns).filter(e => rxns[e]?.length);
+    const pickerId = 'rxnp-' + itemId + '-' + c.at;
     html += '<div class="cmt' + (c.ai ? ' cmt-ai' : '') + '">' +
       '<div class="cmt-av">' + esc(initials) + '</div>' +
       '<div style="flex:1;min-width:0">' +
         '<div class="cmt-name">' + esc(c.ai ? 'Roaster' : c.name) + '</div>' +
         '<div class="cmt-text">' + esc(c.body) + '</div>' +
         '<div class="cmt-time">' + ago(c.at) + '</div>' +
+        '<div class="rxns">' +
+          rxnKeys.map(e => {
+            const mine = rxns[e].includes(myName);
+            const tip = rxns[e].join(', ');
+            return '<button class="rxn-pill' + (mine ? ' mine' : '') + '" title="' + esc(tip) + '" onclick="reactToComment(\'' + itemId + '\',' + c.at + ',\'' + e + '\')">' + e + ' <span>' + rxns[e].length + '</span></button>';
+          }).join('') +
+          '<button class="rxn-add" onclick="toggleRxnPicker(\'' + pickerId + '\')">+</button>' +
+        '</div>' +
+        '<div class="rxn-picker hidden" id="' + pickerId + '">' +
+          RXN_EMOJIS.map(e => '<button class="rxn-opt" onclick="reactToComment(\'' + itemId + '\',' + c.at + ',\'' + e + '\');toggleRxnPicker(\'' + pickerId + '\')">' + e + '</button>').join('') +
+        '</div>' +
       '</div></div>';
   }
   el.innerHTML = html;
+}
+function toggleRxnPicker(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('hidden');
+}
+async function reactToComment(itemId, commentAt, emoji) {
+  const name = store.get('sd_cname', '') || teamName(myRosterId()) || '';
+  const code = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
+  if (!name || !code) { alert('Send a message first to set your name and league code.'); return; }
+  try {
+    const r = await fetch(workerUrl('/comments/' + itemId + '/react'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commentAt, emoji, name, code })
+    });
+    if (!r.ok) return;
+    const comments = await r.json();
+    renderCommentList(itemId, comments);
+  } catch {}
 }
 async function submitComment(itemId) {
   const nameEl = document.getElementById('cn-' + itemId);
@@ -1224,13 +1268,11 @@ async function submitComment(itemId) {
       if (r.status === 403) alert('Wrong league code.');
       else alert('Could not post. Try again.');
       sendEl.disabled = false;
-      sendEl.textContent = 'Send';
       return;
     }
     const comments = await r.json();
     bodyEl.value = '';
     sendEl.disabled = false;
-    sendEl.textContent = 'Send';
     renderCommentList(itemId, comments);
   } catch {
     alert('Could not post. Try again.');
