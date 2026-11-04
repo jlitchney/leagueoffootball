@@ -138,8 +138,7 @@ button{cursor:pointer}
 .fbadge-champ{background:rgba(234,179,8,.22);color:#92400E}
 .creply-btn{background:none;border:0;padding:0;font:500 12px/1 var(--body);color:var(--muted);text-decoration:underline;text-underline-offset:2px;cursor:pointer;margin-top:4px}
 .creply-btn:hover{color:var(--ink)}
-.cthread{display:none;margin-top:6px;border-top:1px solid var(--line)}
-.cthread.open{display:block}
+.cthread{margin-top:8px;border-top:1px solid var(--line);padding-top:4px}
 .cmt{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
 .cmt-av{width:26px;height:26px;border-radius:50%;background:var(--turf-soft);flex-shrink:0;display:flex;align-items:center;justify-content:center;font:700 10px/1 var(--body);color:var(--muted)}
 .cmt-ai .cmt-av{background:var(--accent);color:#fff}
@@ -1124,9 +1123,13 @@ async function loadFeed(){
       if (t === 'starting_a_player_who_wont_play' || t === 'empty_starting_slot') return '<span class="fbadge fbadge-alert">LINEUP</span>';
       return '<span class="fbadge fbadge-recap">THE LEAGUE</span>';
     };
+    const savedName = store.get('sd_cname', '') || teamName(myRosterId()) || '';
+    const savedCode = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
+    const hasCreds = !!(savedName && savedCode);
     const byWeek = {};
     items.slice(0, 40).forEach(i => { const wk = i.week || 0; (byWeek[wk] ||= []).push(i); });
     const weeks = Object.keys(byWeek).map(Number).sort((a, b) => b - a);
+    const allIids = [];
     $('feed').innerHTML = weeks.map((wk, wi) => {
       const wkItems = byWeek[wk];
       const label = wk ? 'Week ' + wk : 'The League';
@@ -1140,17 +1143,30 @@ async function loadFeed(){
         '<div class="feed-wk-items' + (isOpen ? ' open' : '') + '">' +
         wkItems.map(i => {
           const iid = String(i.at);
+          allIids.push(iid);
           return '<div class="feed-item">' +
             badge(i.type) +
             '<b>' + esc(i.title) + '</b>' +
             '<div class="fbody">' + fmtBody(i.body) + '</div>' +
-            '<div style="display:flex;align-items:center;gap:10px"><time>' + ago(i.at) + '</time>' +
-            '<button class="creply-btn" id="crb-' + iid + '" onclick="toggleThread(\'' + iid + '\')">Reply</button></div>' +
-            '<div class="cthread" id="ct-' + iid + '"></div>' +
+            '<time>' + ago(i.at) + '</time>' +
+            '<div class="cthread" id="ct-' + iid + '">' +
+              '<div id="cco-' + iid + '"></div>' +
+              (hasCreds ? '' :
+                '<div class="cform-meta" style="margin-top:6px">' +
+                  '<input class="cinput" id="cn-' + iid + '" placeholder="Your name" value="' + esc(savedName) + '" maxlength="40">' +
+                  '<input class="cinput" id="cc-' + iid + '" placeholder="League code" type="password" value="' + esc(savedCode) + '" maxlength="40">' +
+                '</div>'
+              ) +
+              '<div style="display:flex;gap:6px;align-items:flex-end;margin-top:6px">' +
+                '<textarea class="ctextarea" id="cb-' + iid + '" placeholder="Message..." rows="1" maxlength="500" style="flex:1"></textarea>' +
+                '<button class="csend" onclick="submitComment(\'' + iid + '\')" id="cs-' + iid + '">Send</button>' +
+              '</div>' +
+            '</div>' +
             '</div>';
         }).join('') +
         '</div></div>';
     }).join('');
+    allIids.forEach(iid => loadComments(iid));
   } catch {}
 }
 function ago(t){
@@ -1160,34 +1176,18 @@ function ago(t){
   if (s < 86400) return Math.round(s / 3600) + ' hr ago';
   return new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
-function toggleThread(itemId) {
-  const el = document.getElementById('ct-' + itemId);
-  if (!el) return;
-  const isOpen = el.classList.toggle('open');
-  const btn = document.getElementById('crb-' + itemId);
-  if (btn) btn.textContent = isOpen ? 'Hide' : 'Reply';
-  if (isOpen && !el.dataset.loaded) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">Loading...</div>';
-    el.dataset.loaded = '1';
-    loadComments(itemId);
-  }
-}
 async function loadComments(itemId) {
-  const el = document.getElementById('ct-' + itemId);
-  if (!el) return;
   try {
     const comments = await j(workerUrl('/comments/' + itemId));
-    renderComments(itemId, comments);
-  } catch { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">Could not load. Try again.</div>'; }
+    renderCommentList(itemId, comments);
+  } catch {}
 }
-function renderComments(itemId, comments) {
-  const el = document.getElementById('ct-' + itemId);
-  if (!el) return;
-  const savedName = store.get('sd_cname', '') || teamName(myRosterId()) || '';
-  const savedCode = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
+function renderCommentList(itemId, comments) {
+  const el = document.getElementById('cco-' + itemId);
+  if (!el || !comments.length) return;
   let html = '';
   for (const c of comments) {
-    const initials = c.ai ? 'TC' : c.name.trim().slice(0, 2).toUpperCase();
+    const initials = c.ai ? 'R' : c.name.trim().slice(0, 2).toUpperCase();
     html += '<div class="cmt' + (c.ai ? ' cmt-ai' : '') + '">' +
       '<div class="cmt-av">' + esc(initials) + '</div>' +
       '<div style="flex:1;min-width:0">' +
@@ -1196,21 +1196,7 @@ function renderComments(itemId, comments) {
         '<div class="cmt-time">' + ago(c.at) + '</div>' +
       '</div></div>';
   }
-  const hasCredentials = savedName && savedCode;
-  html += '<div class="cform">' +
-    (hasCredentials ? '' :
-      '<div class="cform-meta">' +
-        '<input class="cinput" id="cn-' + itemId + '" placeholder="Your name" value="' + esc(savedName) + '" maxlength="40">' +
-        '<input class="cinput" id="cc-' + itemId + '" placeholder="League code" type="password" value="' + esc(savedCode) + '" maxlength="40">' +
-      '</div>'
-    ) +
-    '<div class="cform-row" style="display:flex;gap:6px;margin-top:4px">' +
-      '<textarea class="ctextarea" id="cb-' + itemId + '" placeholder="Say something..." rows="2" maxlength="500" style="flex:1"></textarea>' +
-      '<button class="csend" onclick="submitComment(\'' + itemId + '\')" id="cs-' + itemId + '" style="align-self:flex-end">Send</button>' +
-    '</div>' +
-  '</div>';
   el.innerHTML = html;
-  document.getElementById('cb-' + itemId)?.focus();
 }
 async function submitComment(itemId) {
   const nameEl = document.getElementById('cn-' + itemId);
@@ -1243,7 +1229,9 @@ async function submitComment(itemId) {
     }
     const comments = await r.json();
     bodyEl.value = '';
-    renderComments(itemId, comments);
+    sendEl.disabled = false;
+    sendEl.textContent = 'Send';
+    renderCommentList(itemId, comments);
   } catch {
     alert('Could not post. Try again.');
     sendEl.disabled = false;
