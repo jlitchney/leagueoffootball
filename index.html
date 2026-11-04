@@ -341,7 +341,7 @@ button{cursor:pointer}
       </select>
       <label for="loginPw">Password</label>
       <input id="loginPw" type="password" autocomplete="current-password" placeholder="Password" style="font-size:16px">
-      <button class="primary" id="loginBtn">Sign in</button>
+      <button class="primary" id="loginBtn" type="button" onclick="doLogin()">Sign in</button>
     </div>
     <div id="loginMsg"></div>
   </section>
@@ -927,7 +927,6 @@ async function boot(){
   }
 }
 
-$('loginBtn')?.addEventListener('click', doLogin);
 $('loginPw')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 $('loginUser')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('loginPw')?.focus(); });
 if ($('prev')) $('prev').onclick = () => setWeek(S.week - 1);
