@@ -406,8 +406,8 @@ button{cursor:pointer}
 <script>
 /* Past champions, straight off the trophy. Add a line here each year. */
 const CHAMPIONS = [
-  { year: 2019, team: 'Andrew’s football team', owner: 'Andrew Litchney' },
-  { year: 2020, team: 'Andrew’s football team', owner: 'Andrew Litchney' },
+  { year: 2019, team: "Andrew's football team", owner: 'Andrew Litchney' },
+  { year: 2020, team: "Andrew's football team", owner: 'Andrew Litchney' },
   { year: 2021, team: 'Your Mom',               owner: 'Grandma Angie' },
   { year: 2022, team: 'Your Mom',               owner: 'Grandma Angie' },
   { year: 2023, team: 'The Cheeseburger',       owner: 'Cambria Arashiro' },
@@ -498,60 +498,60 @@ function optimalScore(m) {
 
 /* ---------- setup ---------- */
 function showLogin(msg) {
-  $(‘app’).classList.add(‘hidden’); $(‘setup’).classList.remove(‘hidden’);
-  if ($(‘loginMsg’)) $(‘loginMsg’).innerHTML = msg ? ‘<div class=”msg err”>’ + esc(msg) + ‘</div>’ : ‘’;
+  $('app').classList.add('hidden'); $('setup').classList.remove('hidden');
+  if ($('loginMsg')) $('loginMsg').innerHTML = msg ? '<div class="msg err">' + esc(msg) + '</div>' : '';
   refreshTeamNames();
 }
 async function refreshTeamNames() {
   try {
     const [users, rosters] = await Promise.all([
-      j(SL + ‘/league/’ + LEAGUE_ID + ‘/users’),
-      j(SL + ‘/league/’ + LEAGUE_ID + ‘/rosters’)
+      j(SL + '/league/' + LEAGUE_ID + '/users'),
+      j(SL + '/league/' + LEAGUE_ID + '/rosters')
     ]);
     const userMap = Object.fromEntries(users.map(u => [u.user_id, u]));
-    const sel = $(‘loginUser’);
+    const sel = $('loginUser');
     if (!sel) return;
     for (const r of rosters) {
       const u = userMap[r.owner_id] || {};
-      const name = r.metadata?.team_name || u.metadata?.team_name || u.display_name || (‘Team ‘ + r.roster_id);
-      const opt = sel.querySelector(‘option[value=”’ + r.roster_id + ‘”]’);
+      const name = r.metadata?.team_name || u.metadata?.team_name || u.display_name || ('Team ' + r.roster_id);
+      const opt = sel.querySelector('option[value="' + r.roster_id + '"]');
       if (opt) opt.textContent = name;
     }
   } catch {}
 }
 async function doLogin() {
-  const selEl = $(‘loginUser’), pwEl = $(‘loginPw’), btn = $(‘loginBtn’);
+  const selEl = $('loginUser'), pwEl = $('loginPw'), btn = $('loginBtn');
   const rosterId = Number(selEl?.value);
-  const password = (pwEl?.value || ‘’).trim();
-  const msgEl = $(‘loginMsg’);
-  if (!rosterId) { if (msgEl) msgEl.innerHTML = ‘<div class=”msg err”>Pick your team.</div>’; return; }
-  if (!password) { if (msgEl) msgEl.innerHTML = ‘<div class=”msg err”>Enter your password.</div>’; return; }
+  const password = (pwEl?.value || '').trim();
+  const msgEl = $('loginMsg');
+  if (!rosterId) { if (msgEl) msgEl.innerHTML = '<div class="msg err">Pick your team.</div>'; return; }
+  if (!password) { if (msgEl) msgEl.innerHTML = '<div class="msg err">Enter your password.</div>'; return; }
   try {
     if (btn) btn.disabled = true;
-    if (msgEl) msgEl.innerHTML = ‘<div class=”msg”>Signing in…</div>’;
-    const r = await fetch(workerUrl(‘/auth/login’), {
-      method: ‘POST’, headers: { ‘Content-Type’: ‘application/json’ },
+    if (msgEl) msgEl.innerHTML = '<div class="msg">Signing in…</div>';
+    const r = await fetch(workerUrl('/auth/login'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rosterId, password })
     });
-    if (!r.ok) throw new Error(r.status === 401 ? ‘Wrong team or password.’ : ‘Sign in failed (‘ + r.status + ‘). Try again.’);
+    if (!r.ok) throw new Error(r.status === 401 ? 'Wrong team or password.' : 'Sign in failed (' + r.status + '). Try again.');
     const data = await r.json();
-    store.set(‘sd_token’, data.token);
-    store.set(‘sd_cname’, data.teamName);
+    store.set('sd_token', data.token);
+    store.set('sd_cname', data.teamName);
     S.cfg = { leagueId: LEAGUE_ID, rosterId: data.rosterId };
-    store.set(‘sd_cfg’, S.cfg);
+    store.set('sd_cfg', S.cfg);
     boot();
   } catch (e) {
-    if (msgEl) msgEl.innerHTML = ‘<div class=”msg err”>’ + esc(e.message) + ‘</div>’;
+    if (msgEl) msgEl.innerHTML = '<div class="msg err">' + esc(e.message) + '</div>';
   } finally { if (btn) btn.disabled = false; }
 }
 function logout() {
-  store.del(‘sd_token’); store.del(‘sd_cfg’); store.del(‘sd_cname’); store.del(‘sd_session’);
+  store.del('sd_token'); store.del('sd_cfg'); store.del('sd_cname'); store.del('sd_session');
   showLogin();
 }
 function workerFetch(path, opts = {}) {
-  const token = store.get(‘sd_token’, ‘’);
-  const headers = { ‘Content-Type’: ‘application/json’, ...(opts.headers || {}) };
-  if (token) headers[‘Authorization’] = ‘Bearer ‘ + token;
+  const token = store.get('sd_token', '');
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
   return fetch(workerUrl(path), { ...opts, headers });
 }
 
@@ -630,7 +630,7 @@ async function tick(){
     S.lastUpdate = Date.now();
     render();
   } catch (e) {
-    $('main').innerHTML = `<div class="msg err">Couldn’t reach Sleeper (${esc(e.message)}). It will retry automatically.</div>`;
+    $('main').innerHTML = `<div class="msg err">Couldn't reach Sleeper (${esc(e.message)}). It will retry automatically.</div>`;
   } finally {
     S.busy = false; $('refresh').disabled = false; schedule();
   }
@@ -847,7 +847,7 @@ function render(){
     const diff = A.live - B.live, isMine = pair[0].roster_id === mine;
     const leader = diff >= 0 ? A : B;
     verdict = Math.abs(diff) < 0.05 ? 'Projected dead even'
-      : isMine ? (diff > 0 ? `You’re projected to win by <b>${fmt(diff)}</b>` : `You’re projected to lose by <b>${fmt(-diff)}</b>`)
+      : isMine ? (diff > 0 ? `You're projected to win by <b>${fmt(diff)}</b>` : `You're projected to lose by <b>${fmt(-diff)}</b>`)
       : `${esc(leader.name)} projected by <b>${fmt(Math.abs(diff))}</b>`;
     if (S.games) {
       const left = t => [t.now && `${t.now} playing`, t.yet && `${t.yet} yet to play`].filter(Boolean).join(', ') || 'all done';
@@ -882,8 +882,8 @@ function render(){
     ${h2h ? `<div class="h2h-rec">${esc(A.name.split(' ')[0])} ${h2h.wA}–${h2h.wB} ${esc(B.name.split(' ')[0])} all time</div>` : ''}
     <div class="rows">${rows}</div>
     ${benchSection}
-    ${S.proj ? '' : '<div class="msg">Projections didn’t load, so projected totals show points scored only.</div>'}
-    ${S.games ? '' : '<div class="msg">Game clocks didn’t load from ESPN, so minutes left aren’t shown. It will retry.</div>'}`;
+    ${S.proj ? '' : '<div class="msg">Projections didn\'t load, so projected totals show points scored only.</div>'}
+    ${S.games ? '' : '<div class="msg">Game clocks didn\'t load from ESPN, so minutes left aren\'t shown. It will retry.</div>'}`;
   updateStatus();
   renderMoney();
   renderHighScoreRace();
@@ -912,7 +912,7 @@ async function boot(){
     const [nfl, league, users, rosters] = await Promise.all([
       j(SL + '/state/nfl'), j(`${SL}/league/${id}`), j(`${SL}/league/${id}/users`), j(`${SL}/league/${id}/rosters`), loadPlayers()
     ]);
-    if (!league) throw new Error('That league ID wasn’t found.');
+    if (!league) throw new Error('That league ID wasn\'t found.');
     S.nfl = nfl; S.league = league; S.rosters = rosters;
     S.users = Object.fromEntries(users.map(u => [u.user_id, u]));
     S.season = league.season || nfl.season;
@@ -923,7 +923,7 @@ async function boot(){
     setWeek(nfl.season_type === 'pre' ? 1 : (nfl.display_week || nfl.week || 1));
     loadMoney();
   } catch (e) {
-    showLogin(‘Couldn\’t load the league: ‘ + e.message);
+    showLogin('Couldn\'t load the league: ' + e.message);
   }
 }
 
@@ -1091,7 +1091,7 @@ async function renderAlerts(){
   if (!canPush()) {
     box.innerHTML = isIOS && !standalone()
       ? '<span>For roast alerts, tap Share, then Add to Home Screen, and open The League from your home screen.</span>'
-      : '<span>This browser doesn’t support notifications.</span>';
+      : '<span>This browser doesn\'t support notifications.</span>';
     return;
   }
   if (Notification.permission === 'denied') {
@@ -1110,25 +1110,25 @@ function openAlertForm(){
   $('alertForm').classList.remove('hidden');
 }
 async function enableAlerts(){
-  const btn = $(‘enableAlerts’);
-  btn.disabled = true; $(‘alertErr’).innerHTML = ‘’;
+  const btn = $('enableAlerts');
+  btn.disabled = true; $('alertErr').innerHTML = '';
   try {
     const perm = await Notification.requestPermission();
-    if (perm !== ‘granted’) throw new Error(‘Notifications weren\’t allowed, so alerts are still off.’);
+    if (perm !== 'granted') throw new Error('Notifications weren\'t allowed, so alerts are still off.');
     const reg = swReg || await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(PUSH.vapidPublicKey) });
-    const res = await workerFetch(‘/subscribe’, {
-      method: ‘POST’,
+    const res = await workerFetch('/subscribe', {
+      method: 'POST',
       body: JSON.stringify({ subscription: sub.toJSON() })
     });
     if (!res.ok) {
       await sub.unsubscribe();
       if (res.status === 401) { logout(); return; }
-      throw new Error(‘Couldn\’t save alerts (error ‘ + res.status + ‘). Try again.’);
+      throw new Error('Couldn\'t save alerts (error ' + res.status + '). Try again.');
     }
-    $(‘alertForm’).classList.add(‘hidden’);
+    $('alertForm').classList.add('hidden');
   } catch (e) {
-    $(‘alertErr’).innerHTML = ‘<div class="msg err">’ + esc(e.message) + ‘</div>’;
+    $('alertErr').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>';
   } finally {
     btn.disabled = false; renderAlerts();
   }
@@ -1832,7 +1832,7 @@ function renderMoney(){
   }).join('');
   $('money').innerHTML = `
     <h2>Money</h2>
-    <p class="sub">${usd(PAYOUTS.weeklyHigh)} to each week’s top score through week ${M.lastWeek}. ${usd(PAYOUTS.first)}, ${usd(PAYOUTS.second)} and ${usd(PAYOUTS.third)} to the top three.</p>
+    <p class="sub">${usd(PAYOUTS.weeklyHigh)} to each week's top score through week ${M.lastWeek}. ${usd(PAYOUTS.first)}, ${usd(PAYOUTS.second)} and ${usd(PAYOUTS.third)} to the top three.</p>
     ${pace}
     ${boomerangSection()}
     ${earningsChart(entries)}
