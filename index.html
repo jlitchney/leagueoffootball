@@ -160,6 +160,12 @@ button{cursor:pointer}
 .rxn-picker.hidden{display:none}
 .rxn-opt{font-size:22px;padding:3px 5px;border-radius:8px;cursor:pointer;border:0;background:none}
 .rxn-opt:hover,.rxn-opt:active{background:var(--turf-soft)}
+.cimg-btn{background:none;border:0;padding:4px 5px;color:var(--muted);flex-shrink:0;cursor:pointer;line-height:1;display:flex;align-items:center}
+.cimg-btn:disabled{opacity:.35}
+.cimg-prev{margin-top:4px;position:relative;display:inline-block}
+.cimg-prev img{max-height:80px;max-width:200px;border-radius:8px;border:1px solid var(--line);display:block}
+.cimg-prev-rm{position:absolute;top:-7px;right:-7px;width:18px;height:18px;border-radius:50%;background:#333;color:#fff;border:0;font-size:12px;line-height:18px;text-align:center;padding:0;cursor:pointer}
+.cmt-img{max-width:100%;border-radius:10px;margin-top:5px;border:1px solid var(--line);display:block;cursor:pointer}
 /* champions: styled after the trophy's engraved plaques */
 .hall{margin-top:26px}
 .hall h2{font:800 30px/1 var(--display);margin:0 0 4px;letter-spacing:-.2px}
@@ -1166,9 +1172,12 @@ async function loadFeed(){
                 '</div>'
               ) +
               '<div style="display:flex;gap:6px;align-items:flex-end;margin-top:6px">' +
+                '<input type="file" accept="image/*,image/heic" id="cfi-' + iid + '" style="display:none" onchange="onImgPicked(\'' + iid + '\')">' +
+                '<button class="cimg-btn" onclick="document.getElementById(\'cfi-' + iid + '\').click()" title="Attach image" aria-label="Attach image">' + CAMERA_ICON + '</button>' +
                 '<textarea class="ctextarea" id="cb-' + iid + '" placeholder="Message..." rows="1" maxlength="500" style="flex:1"></textarea>' +
                 '<button class="csend" onclick="submitComment(\'' + iid + '\')" id="cs-' + iid + '" aria-label="Send">' + SEND_ICON + '</button>' +
               '</div>' +
+              '<div id="cip-' + iid + '" class="cimg-prev" style="display:none"></div>' +
             '</div>' +
             '</div>';
         }).join('') +
@@ -1184,8 +1193,11 @@ function ago(t){
   if (s < 86400) return Math.round(s / 3600) + ' hr ago';
   return new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
+const UPLOAD_URL = 'https://league-upload.vercel.app/api/upload';
 const SEND_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5,12 12,5 19,12"/></svg>';
+const CAMERA_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 const RXN_EMOJIS = ['❤️', '👍', '😂', '🔥', '💀', '👎'];
+const pendingImages = {};
 async function loadComments(itemId) {
   try {
     const comments = await j(workerUrl('/comments/' + itemId));
@@ -1206,7 +1218,8 @@ function renderCommentList(itemId, comments) {
       '<div class="cmt-av">' + esc(initials) + '</div>' +
       '<div style="flex:1;min-width:0">' +
         '<div class="cmt-name">' + esc(c.ai ? 'Roaster' : c.name) + '</div>' +
-        '<div class="cmt-text">' + esc(c.body) + '</div>' +
+        (c.body ? '<div class="cmt-text">' + esc(c.body) + '</div>' : '') +
+        (c.imageUrl ? '<img class="cmt-img" src="' + esc(c.imageUrl) + '" alt="image" loading="lazy" onclick="window.open(this.src)">' : '') +
         '<div class="cmt-time">' + ago(c.at) + '</div>' +
         '<div class="rxns">' +
           rxnKeys.map(e => {
@@ -1226,6 +1239,29 @@ function renderCommentList(itemId, comments) {
 function toggleRxnPicker(id) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('hidden');
+}
+function onImgPicked(itemId) {
+  const fileEl = document.getElementById('cfi-' + itemId);
+  const file = fileEl?.files?.[0];
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) { alert('Image too large (max 8 MB).'); fileEl.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    pendingImages[itemId] = { dataUrl: e.target.result, name: file.name };
+    const prevEl = document.getElementById('cip-' + itemId);
+    if (!prevEl) return;
+    prevEl.style.display = 'inline-block';
+    prevEl.innerHTML = '<img src="' + e.target.result + '">' +
+      '<button class="cimg-prev-rm" onclick="clearPendingImage(\'' + itemId + '\')">x</button>';
+  };
+  reader.readAsDataURL(file);
+}
+function clearPendingImage(itemId) {
+  delete pendingImages[itemId];
+  const prevEl = document.getElementById('cip-' + itemId);
+  if (prevEl) { prevEl.innerHTML = ''; prevEl.style.display = 'none'; }
+  const fileEl = document.getElementById('cfi-' + itemId);
+  if (fileEl) fileEl.value = '';
 }
 async function reactToComment(itemId, commentAt, emoji) {
   const name = store.get('sd_cname', '') || teamName(myRosterId()) || '';
@@ -1253,31 +1289,49 @@ async function submitComment(itemId) {
   const name = (nameEl ? nameEl.value.trim() : savedName);
   const code = (codeEl ? codeEl.value.trim() : savedCode);
   const body = bodyEl.value.trim();
-  if (!name || !code || !body) { alert('Fill in your name, the league code, and a message.'); return; }
+  const pending = pendingImages[itemId];
+  if (!name || !code || (!body && !pending)) { alert('Fill in your name, the league code, and a message or image.'); return; }
   store.set('sd_cname', name);
   store.set('sd_ccode', code);
   sendEl.disabled = true;
-  sendEl.textContent = '...';
+  sendEl.innerHTML = '<span style="font-size:11px;font-weight:600">...</span>';
+  let imageUrl = '';
+  if (pending) {
+    try {
+      const up = await fetch(UPLOAD_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, data: pending.dataUrl, name: pending.name })
+      });
+      if (up.ok) { const d = await up.json(); imageUrl = d.url || ''; }
+      else if (up.status === 403) { alert('Wrong league code.'); sendEl.disabled = false; sendEl.innerHTML = SEND_ICON; return; }
+    } catch {}
+  }
   try {
+    const payload = { name, code, body };
+    if (imageUrl) payload.imageUrl = imageUrl;
     const r = await fetch(workerUrl('/comments/' + itemId), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, code, body })
+      body: JSON.stringify(payload)
     });
     if (!r.ok) {
       if (r.status === 403) alert('Wrong league code.');
       else alert('Could not post. Try again.');
       sendEl.disabled = false;
+      sendEl.innerHTML = SEND_ICON;
       return;
     }
     const comments = await r.json();
     bodyEl.value = '';
+    clearPendingImage(itemId);
     sendEl.disabled = false;
+    sendEl.innerHTML = SEND_ICON;
     renderCommentList(itemId, comments);
   } catch {
     alert('Could not post. Try again.');
     sendEl.disabled = false;
-    sendEl.textContent = 'Send';
+    sendEl.innerHTML = SEND_ICON;
   }
 }
 /* ---------- money ---------- */
