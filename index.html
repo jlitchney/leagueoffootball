@@ -150,7 +150,8 @@ button{cursor:pointer}
 .cform-meta{display:flex;gap:5px;margin-bottom:5px}
 .cinput{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;font-family:var(--body);flex:1;min-width:0}
 .ctextarea{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;font-family:var(--body);resize:none;box-sizing:border-box;overflow:hidden;min-height:36px}
-.cform-row{position:sticky;bottom:0;background:var(--bg);padding:6px 0 2px;z-index:20;border-top:1px solid var(--line);margin-top:6px}
+.cform-row{background:var(--bg);padding:6px 0 2px;border-top:1px solid var(--line);margin-top:6px}
+.cform-row.chatpinned{position:fixed;left:0;right:0;bottom:0;z-index:100;padding:8px 14px calc(env(safe-area-inset-bottom,0px) + 4px);box-sizing:border-box}
 .cform-send{display:flex;justify-content:flex-end;margin-top:5px}
 .csend{width:32px;height:32px;border-radius:50%;border:0;background:#007AFF;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;cursor:pointer}
 .csend:disabled{opacity:.35}
@@ -1197,7 +1198,7 @@ async function loadFeed(){
               '<div class="cform-row" style="display:flex;gap:6px;align-items:flex-end">' +
                 '<input type="file" accept="image/*,image/heic" id="cfi-' + iid + '" style="display:none" onchange="onImgPicked(\'' + iid + '\')">' +
                 '<button class="cimg-btn" onclick="document.getElementById(\'cfi-' + iid + '\').click()" title="Attach image" aria-label="Attach image">' + CAMERA_ICON + '</button>' +
-                '<textarea class="ctextarea" id="cb-' + iid + '" placeholder="Message..." rows="1" maxlength="500" style="flex:1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" onfocus="chatFocus(this)"></textarea>' +
+                '<textarea class="ctextarea" id="cb-' + iid + '" placeholder="Message..." rows="1" maxlength="500" style="flex:1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" onfocus="chatFocus(this)" onblur="chatBlur(this)"></textarea>' +
                 '<button class="csend" onclick="submitComment(\'' + iid + '\')" id="cs-' + iid + '" aria-label="Send">' + SEND_ICON + '</button>' +
               '</div>' +
               '<div id="cip-' + iid + '" class="cimg-prev" style="display:none"></div>' +
@@ -1866,13 +1867,35 @@ if (location.hash === '#roasts') {
 }
 
 function chatFocus(ta) {
-  setTimeout(() => ta.scrollIntoView({ behavior: 'smooth', block: 'end' }), 350);
+  const row = ta.closest('.cform-row');
+  if (!row || row.classList.contains('chatpinned')) return;
+  row.classList.add('chatpinned');
+  if (!row._spacer) {
+    const sp = document.createElement('div');
+    sp.style.height = row.offsetHeight + 'px';
+    row.parentNode.insertBefore(sp, row);
+    row._spacer = sp;
+  }
+  setTimeout(() => {
+    const item = row.closest('.feed-item');
+    if (item) item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 400);
+}
+function chatBlur(ta) {
+  setTimeout(() => {
+    const row = ta.closest('.cform-row');
+    if (!row) return;
+    if (row.contains(document.activeElement) && document.activeElement !== ta) return;
+    row.classList.remove('chatpinned');
+    row.style.bottom = '';
+    if (row._spacer) { row._spacer.remove(); row._spacer = null; }
+  }, 200);
 }
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', () => {
-    const keyboardH = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
-    document.querySelectorAll('.cform-row').forEach(el => {
-      el.style.bottom = keyboardH > 50 ? keyboardH + 'px' : '';
+    const keyboardH = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+    document.querySelectorAll('.cform-row.chatpinned').forEach(el => {
+      el.style.bottom = keyboardH > 50 ? keyboardH + 'px' : '0px';
     });
   });
 }
