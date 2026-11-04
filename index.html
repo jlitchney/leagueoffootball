@@ -522,19 +522,18 @@ async function refreshTeamNames() {
 async function doLogin() {
   const selEl = $(‘loginUser’), pwEl = $(‘loginPw’), btn = $(‘loginBtn’);
   const rosterId = Number(selEl?.value);
-  const password = pwEl?.value || ‘’;
-  if (!rosterId || !password) {
-    if (!rosterId) $(‘loginMsg’).innerHTML = ‘<div class=”msg err”>Pick your team.</div>’;
-    return;
-  }
-  btn.disabled = true;
-  $(‘loginMsg’).innerHTML = ‘<div class=”msg”>Signing in…</div>’;
+  const password = (pwEl?.value || ‘’).trim();
+  const msgEl = $(‘loginMsg’);
+  if (!rosterId) { if (msgEl) msgEl.innerHTML = ‘<div class=”msg err”>Pick your team.</div>’; return; }
+  if (!password) { if (msgEl) msgEl.innerHTML = ‘<div class=”msg err”>Enter your password.</div>’; return; }
   try {
+    if (btn) btn.disabled = true;
+    if (msgEl) msgEl.innerHTML = ‘<div class=”msg”>Signing in…</div>’;
     const r = await fetch(workerUrl(‘/auth/login’), {
       method: ‘POST’, headers: { ‘Content-Type’: ‘application/json’ },
       body: JSON.stringify({ rosterId, password })
     });
-    if (!r.ok) throw new Error(r.status === 401 ? ‘Wrong team name or password.’ : ‘Sign in failed. Try again.’);
+    if (!r.ok) throw new Error(r.status === 401 ? ‘Wrong team or password.’ : ‘Sign in failed (‘ + r.status + ‘). Try again.’);
     const data = await r.json();
     store.set(‘sd_token’, data.token);
     store.set(‘sd_cname’, data.teamName);
@@ -542,7 +541,7 @@ async function doLogin() {
     store.set(‘sd_cfg’, S.cfg);
     boot();
   } catch (e) {
-    $(‘loginMsg’).innerHTML = ‘<div class=”msg err”>’ + esc(e.message) + ‘</div>’;
+    if (msgEl) msgEl.innerHTML = ‘<div class=”msg err”>’ + esc(e.message) + ‘</div>’;
   } finally { if (btn) btn.disabled = false; }
 }
 function logout() {
