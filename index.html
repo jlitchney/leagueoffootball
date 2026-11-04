@@ -368,6 +368,7 @@ button{cursor:pointer}
           <button class="primary" id="enableAlerts">Turn on alerts</button>
           <div id="alertErr"></div>
         </div>
+        <div class="alertForm hidden" id="chatIdCard"></div>
         <div class="feed" id="feed"></div>
       </section>
       <p class="note">
@@ -1061,6 +1062,7 @@ async function initPush(){
     try { swReg = await navigator.serviceWorker.register('./sw.js'); } catch (e) { console.warn('Service worker failed', e); }
   }
   renderAlerts();
+  renderChatId();
 }
 async function currentSub(){
   try { return swReg ? await swReg.pushManager.getSubscription() : null; } catch { return null; }
@@ -1111,7 +1113,9 @@ async function enableAlerts(){
     }
     $('alertForm').classList.add('hidden');
     store.set('sd_lcode', $('code').value.trim());
+    store.set('sd_ccode', $('code').value.trim());
     store.set('sd_cname', store.get('sd_cname', '') || teamName(Number($('alertTeam').value)));
+    renderChatId();
   } catch (e) {
     $('alertErr').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
   } finally {
@@ -1125,6 +1129,39 @@ async function disableAlerts(){
     await sub.unsubscribe();
   }
   renderAlerts();
+}
+let chatIdEditing = false;
+function renderChatId() {
+  const card = $('chatIdCard');
+  if (!card) return;
+  card.classList.remove('hidden');
+  const name = store.get('sd_cname', '') || teamName(myRosterId()) || '';
+  const code = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
+  if (name && code && !chatIdEditing) {
+    card.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">' +
+      '<span style="font-size:14px">Chatting as <b>' + esc(name) + '</b></span>' +
+      '<button class="icon" onclick="chatIdEditing=true;renderChatId()">Edit</button>' +
+    '</div>';
+  } else {
+    card.innerHTML = '<div style="font:600 14px/1 var(--body);margin-bottom:10px">Your chat identity</div>' +
+      '<input id="chatName" placeholder="Display name" value="' + esc(name) + '" maxlength="40" autocomplete="nickname" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;box-sizing:border-box;margin-bottom:8px">' +
+      '<input id="chatCode" placeholder="League code" type="password" value="' + esc(code) + '" maxlength="40" autocomplete="off" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;box-sizing:border-box;margin-bottom:8px">' +
+      '<button class="primary" onclick="saveChatId()">Save</button>';
+  }
+}
+function saveChatId() {
+  const nameEl = $('chatName');
+  const codeEl = $('chatCode');
+  const name = nameEl ? nameEl.value.trim() : '';
+  const code = codeEl ? codeEl.value.trim() : '';
+  if (!name) { nameEl && nameEl.focus(); return; }
+  if (!code) { codeEl && codeEl.focus(); return; }
+  store.set('sd_cname', name);
+  store.set('sd_ccode', code);
+  store.set('sd_lcode', code);
+  chatIdEditing = false;
+  renderChatId();
+  loadFeed();
 }
 async function loadFeed(){
   if (!pushReady()) return;
@@ -1142,9 +1179,6 @@ async function loadFeed(){
       if (t === 'starting_a_player_who_wont_play' || t === 'empty_starting_slot') return '<span class="fbadge fbadge-alert">LINEUP</span>';
       return '<span class="fbadge fbadge-recap">THE LEAGUE</span>';
     };
-    const savedName = store.get('sd_cname', '') || teamName(myRosterId()) || '';
-    const savedCode = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
-    const hasCreds = !!savedCode;
     const byWeek = {};
     items.slice(0, 40).forEach(i => { const wk = i.week || 0; (byWeek[wk] ||= []).push(i); });
     const weeks = Object.keys(byWeek).map(Number).sort((a, b) => b - a);
@@ -1170,12 +1204,6 @@ async function loadFeed(){
             '<time>' + ago(i.at) + '</time>' +
             '<div class="cthread" id="ct-' + iid + '">' +
               '<div id="cco-' + iid + '"></div>' +
-              (hasCreds ? '' :
-                '<div class="cform-meta" style="margin-top:6px">' +
-                  '<input class="cinput" id="cn-' + iid + '" placeholder="Your name" value="' + esc(savedName) + '" maxlength="40" onblur="var v=this.value.trim();if(v)store.set(\'sd_cname\',v)">' +
-                  '<input class="cinput" id="cc-' + iid + '" placeholder="League code" type="password" value="' + esc(savedCode) + '" maxlength="40" onblur="var v=this.value.trim();if(v){store.set(\'sd_ccode\',v);store.set(\'sd_lcode\',v)}">' +
-                '</div>'
-              ) +
               '<div id="crb-' + iid + '" class="creply-bar"></div>' +
               '<div style="display:flex;gap:6px;align-items:flex-end;margin-top:6px">' +
                 '<input type="file" accept="image/*,image/heic" id="cfi-' + iid + '" style="display:none" onchange="onImgPicked(\'' + iid + '\')">' +
@@ -1300,7 +1328,7 @@ function clearPendingImage(itemId) {
 async function reactToComment(itemId, commentAt, emoji) {
   const name = store.get('sd_cname', '') || teamName(myRosterId()) || '';
   const code = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
-  if (!name || !code) { alert('Send a message first to set your name and league code.'); return; }
+  if (!name || !code) { chatIdEditing = true; renderChatId(); $('chatIdCard').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   try {
     const r = await fetch(workerUrl('/comments/' + itemId + '/react'), {
       method: 'POST',
@@ -1313,21 +1341,20 @@ async function reactToComment(itemId, commentAt, emoji) {
   } catch {}
 }
 async function submitComment(itemId) {
-  const nameEl = document.getElementById('cn-' + itemId);
-  const codeEl = document.getElementById('cc-' + itemId);
   const bodyEl = document.getElementById('cb-' + itemId);
   const sendEl = document.getElementById('cs-' + itemId);
   if (!bodyEl || !sendEl) return;
-  const savedName = store.get('sd_cname', '') || teamName(myRosterId()) || '';
-  const savedCode = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
-  const name = (nameEl ? nameEl.value.trim() : savedName);
-  const code = (codeEl ? codeEl.value.trim() : savedCode);
+  const name = store.get('sd_cname', '') || teamName(myRosterId()) || '';
+  const code = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
   const body = bodyEl.value.trim();
   const pending = pendingImages[itemId];
-  if (!name || !code || (!body && !pending)) { alert('Fill in your name, the league code, and a message or image.'); return; }
-  store.set('sd_cname', name);
-  store.set('sd_ccode', code);
-  store.set('sd_lcode', code);
+  if (!name || !code) {
+    chatIdEditing = !name || !code;
+    renderChatId();
+    $('chatIdCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  if (!body && !pending) return;
   sendEl.disabled = true;
   sendEl.innerHTML = '<span style="font-size:11px;font-weight:600">...</span>';
   let imageUrl = '';
