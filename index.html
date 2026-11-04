@@ -901,6 +901,8 @@ async function boot(){
     S.season = league.season || nfl.season;
     S.stype = nfl.season_type === 'post' ? 'post' : 'regular';
     $('leagueName').textContent = league.name;
+    const myTN = teamName(myRosterId());
+    if (myTN) { store.set('sd_cname', myTN); renderChatId(); }
     setWeek(nfl.season_type === 'pre' ? 1 : (nfl.display_week || nfl.week || 1));
     loadMoney();
   } catch (e) {
@@ -1135,28 +1137,24 @@ function renderChatId() {
   const card = $('chatIdCard');
   if (!card) return;
   card.classList.remove('hidden');
-  const name = store.get('sd_cname', '') || teamName(myRosterId()) || '';
+  const teamNm = teamName(myRosterId()) || store.get('sd_cname', '');
   const code = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
-  if (name && code && !chatIdEditing) {
+  if (code && !chatIdEditing) {
     card.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">' +
-      '<span style="font-size:14px">Chatting as <b>' + esc(name) + '</b></span>' +
+      '<span style="font-size:14px">Chatting as <b>' + esc(teamNm || 'your team') + '</b> &middot; code saved</span>' +
       '<button class="icon" onclick="chatIdEditing=true;renderChatId()">Edit</button>' +
     '</div>';
   } else {
-    card.innerHTML = '<div style="font:600 14px/1 var(--body);margin-bottom:10px">Your chat identity</div>' +
-      '<input id="chatName" placeholder="Display name" value="' + esc(name) + '" maxlength="40" autocomplete="nickname" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;box-sizing:border-box;margin-bottom:8px">' +
-      '<input id="chatCode" placeholder="League code" type="password" value="' + esc(code) + '" maxlength="40" autocomplete="off" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;box-sizing:border-box;margin-bottom:8px">' +
+    card.innerHTML = (teamNm ? '<div style="font-size:14px;margin-bottom:10px">Chatting as <b>' + esc(teamNm) + '</b></div>' : '') +
+      '<label style="font:600 14px/1 var(--body);display:block;margin-bottom:6px">League code</label>' +
+      '<input id="chatCode" placeholder="Enter league code" type="password" value="' + esc(code) + '" maxlength="40" autocomplete="off" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;box-sizing:border-box;margin-bottom:8px">' +
       '<button class="primary" onclick="saveChatId()">Save</button>';
   }
 }
 function saveChatId() {
-  const nameEl = $('chatName');
   const codeEl = $('chatCode');
-  const name = nameEl ? nameEl.value.trim() : '';
   const code = codeEl ? codeEl.value.trim() : '';
-  if (!name) { nameEl && nameEl.focus(); return; }
   if (!code) { codeEl && codeEl.focus(); return; }
-  store.set('sd_cname', name);
   store.set('sd_ccode', code);
   store.set('sd_lcode', code);
   chatIdEditing = false;
