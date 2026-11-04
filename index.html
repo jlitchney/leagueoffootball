@@ -321,15 +321,16 @@ button{cursor:pointer}
 <div class="wrap">
 
   <section id="setup" class="setup hidden">
-    <h1>Sunday, live.</h1>
-    <p>Your Sleeper matchup with time left to play and projections that move with the game.</p>
-    <div id="whoBox">
-      <label for="who">Sleeper username or league ID</label>
-      <input id="who" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. jason123">
-      <button class="primary" id="go">Load my league</button>
+    <h1>The League</h1>
+    <p>Sign in with your team name and password.</p>
+    <div id="loginBox">
+      <label for="loginUser">Team name</label>
+      <input id="loginUser" autocomplete="username" autocapitalize="words" spellcheck="false" placeholder="e.g. Thunder Chickens" style="font-size:16px">
+      <label for="loginPw">Password</label>
+      <input id="loginPw" type="password" autocomplete="current-password" placeholder="Password" style="font-size:16px">
+      <button class="primary" id="loginBtn">Sign in</button>
     </div>
-    <div id="setupMsg"></div>
-    <div id="choices" class="choices"></div>
+    <div id="loginMsg"></div>
   </section>
 
   <section id="app" class="hidden">
@@ -361,10 +362,7 @@ button{cursor:pointer}
         <h2>Roasts</h2>
         <div class="alerts" id="alerts"></div>
         <div class="alertForm hidden" id="alertForm">
-          <label for="code">League code</label>
-          <input id="code" autocomplete="off" autocapitalize="off" spellcheck="false">
-          <label for="alertTeam">Your team</label>
-          <select id="alertTeam"></select>
+          <div style="font-size:14px;color:var(--muted)">You'll get a notification whenever a roast drops or someone comments.</div>
           <button class="primary" id="enableAlerts">Turn on alerts</button>
           <div id="alertErr"></div>
         </div>
@@ -486,56 +484,42 @@ function optimalScore(m) {
 }
 
 /* ---------- setup ---------- */
-function showSetup(msg){
-  $('app').classList.add('hidden'); $('setup').classList.remove('hidden');
-  $('choices').innerHTML = '';
-  $('whoBox').classList.remove('hidden');
-  $('setupMsg').innerHTML = msg ? `<div class="msg err">${esc(msg)}</div>` : '';
+function showLogin(msg) {
+  $(‘app’).classList.add(‘hidden’); $(‘setup’).classList.remove(‘hidden’);
+  if ($(‘loginMsg’)) $(‘loginMsg’).innerHTML = msg ? ‘<div class=”msg err”>’ + esc(msg) + ‘</div>’ : ‘’;
 }
-async function pickTeam(){
-  showSetup();
-  $('whoBox').classList.add('hidden');
-  $('setupMsg').innerHTML = '<div class="msg">Loading teams…</div>';
-  try { await chooseLeague(LEAGUE_ID, null); }
-  catch (e) { $('setupMsg').innerHTML = `<div class="msg err">Couldn’t load the league: ${esc(e.message)}</div>`; }
-}
-async function startSetup(){
-  const v = $('who').value.trim();
-  if (!v) return;
-  $('go').disabled = true; $('setupMsg').innerHTML = '<div class="msg">Looking that up…</div>'; $('choices').innerHTML = '';
+async function doLogin() {
+  const usernameEl = $(‘loginUser’), pwEl = $(‘loginPw’), btn = $(‘loginBtn’);
+  const username = usernameEl?.value.trim() || ‘’;
+  const password = pwEl?.value || ‘’;
+  if (!username || !password) return;
+  btn.disabled = true;
+  $(‘loginMsg’).innerHTML = ‘<div class=”msg”>Signing in…</div>’;
   try {
-    const nfl = await j(SL + '/state/nfl');
-    if (/^\d{12,}$/.test(v)) {
-      await chooseLeague(v, null);
-    } else {
-      const user = await j(SL + '/user/' + encodeURIComponent(v));
-      if (!user || !user.user_id) throw new Error(`No Sleeper user named “${v}”. Check the spelling.`);
-      const leagues = await j(`${SL}/user/${user.user_id}/leagues/nfl/${nfl.season}`);
-      if (!leagues.length) throw new Error(`${user.display_name} has no ${nfl.season} leagues.`);
-      if (leagues.length === 1) return chooseLeague(leagues[0].league_id, user.user_id);
-      $('setupMsg').innerHTML = '<p style="margin:16px 0 0">Pick a league:</p>';
-      $('choices').innerHTML = leagues.map(l =>
-        `<button data-l="${esc(l.league_id)}">${esc(l.name)}<small>${l.total_rosters} teams</small></button>`).join('');
-      $('choices').onclick = e => { const b = e.target.closest('button'); if (b) chooseLeague(b.dataset.l, user.user_id); };
-    }
+    const r = await fetch(workerUrl(‘/auth/login’), {
+      method: ‘POST’, headers: { ‘Content-Type’: ‘application/json’ },
+      body: JSON.stringify({ username, password })
+    });
+    if (!r.ok) throw new Error(r.status === 401 ? ‘Wrong team name or password.’ : ‘Sign in failed. Try again.’);
+    const data = await r.json();
+    store.set(‘sd_token’, data.token);
+    store.set(‘sd_cname’, data.teamName);
+    S.cfg = { leagueId: LEAGUE_ID, rosterId: data.rosterId };
+    store.set(‘sd_cfg’, S.cfg);
+    boot();
   } catch (e) {
-    $('setupMsg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
-  } finally { $('go').disabled = false; }
+    $(‘loginMsg’).innerHTML = ‘<div class=”msg err”>’ + esc(e.message) + ‘</div>’;
+  } finally { if (btn) btn.disabled = false; }
 }
-async function chooseLeague(leagueId, userId){
-  if (userId) { S.cfg = { leagueId, userId }; store.set('sd_cfg', S.cfg); return boot(); }
-  // League ID only: ask which team is theirs
-  const [rosters, users] = await Promise.all([j(`${SL}/league/${leagueId}/rosters`), j(`${SL}/league/${leagueId}/users`)]);
-  const byId = Object.fromEntries(users.map(u => [u.user_id, u]));
-  $('setupMsg').innerHTML = '<p style="margin:16px 0 0">Which team is yours?</p>';
-  $('choices').innerHTML = rosters.map(r => {
-    const u = byId[r.owner_id];
-    return `<button data-r="${r.roster_id}">${esc(u?.metadata?.team_name || u?.display_name || 'Team ' + r.roster_id)}<small>${esc(u?.display_name || '')}</small></button>`;
-  }).join('');
-  $('choices').onclick = e => {
-    const b = e.target.closest('button'); if (!b) return;
-    S.cfg = { leagueId, rosterId: Number(b.dataset.r) }; store.set('sd_cfg', S.cfg); boot();
-  };
+function logout() {
+  store.del(‘sd_token’); store.del(‘sd_cfg’); store.del(‘sd_cname’); store.del(‘sd_session’);
+  showLogin();
+}
+function workerFetch(path, opts = {}) {
+  const token = store.get(‘sd_token’, ‘’);
+  const headers = { ‘Content-Type’: ‘application/json’, ...(opts.headers || {}) };
+  if (token) headers[‘Authorization’] = ‘Bearer ‘ + token;
+  return fetch(workerUrl(path), { ...opts, headers });
 }
 
 /* ---------- data ---------- */
@@ -906,12 +890,13 @@ async function boot(){
     setWeek(nfl.season_type === 'pre' ? 1 : (nfl.display_week || nfl.week || 1));
     loadMoney();
   } catch (e) {
-    showSetup(`Couldn’t load the league: ${e.message}`);
+    showLogin(‘Couldn\’t load the league: ‘ + e.message);
   }
 }
 
-$('go').onclick = startSetup;
-$('who').addEventListener('keydown', e => { if (e.key === 'Enter') startSetup(); });
+$('loginBtn').onclick = doLogin;
+$('loginPw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+$('loginUser').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginPw').focus(); });
 $('prev').onclick = () => setWeek(S.week - 1);
 $('next').onclick = () => setWeek(S.week + 1);
 $('refresh').onclick = () => tick();
@@ -1089,37 +1074,29 @@ async function renderAlerts(){
   else $('alertOn').onclick = openAlertForm;
 }
 function openAlertForm(){
-  const mine = S.league ? myRosterId() : null;
-  $('alertTeam').innerHTML = S.rosters.map(r =>
-    `<option value="${r.roster_id}" ${r.roster_id === mine ? 'selected' : ''}>${esc(teamName(r.roster_id))}</option>`).join('');
   $('alertErr').innerHTML = '';
   $('alertForm').classList.remove('hidden');
 }
 async function enableAlerts(){
-  const btn = $('enableAlerts');
-  btn.disabled = true; $('alertErr').innerHTML = '';
+  const btn = $(‘enableAlerts’);
+  btn.disabled = true; $(‘alertErr’).innerHTML = ‘’;
   try {
-    // iOS requires this to be the first thing that happens after the tap
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') throw new Error('Notifications weren’t allowed, so alerts are still off.');
+    if (perm !== ‘granted’) throw new Error(‘Notifications weren\’t allowed, so alerts are still off.’);
     const reg = swReg || await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(PUSH.vapidPublicKey) });
-    const r = S.rosters.find(x => x.roster_id === Number($('alertTeam').value));
-    const res = await fetch(workerUrl('/subscribe'), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: $('code').value, subscription: sub.toJSON(), ownerId: r?.owner_id || '', name: r ? teamName(r.roster_id) : '' })
+    const res = await workerFetch(‘/subscribe’, {
+      method: ‘POST’,
+      body: JSON.stringify({ subscription: sub.toJSON() })
     });
     if (!res.ok) {
       await sub.unsubscribe();
-      throw new Error(res.status === 403 ? 'That league code isn’t right.' : `Couldn’t save alerts (error ${res.status}). Try again.`);
+      if (res.status === 401) { logout(); return; }
+      throw new Error(‘Couldn\’t save alerts (error ‘ + res.status + ‘). Try again.’);
     }
-    $('alertForm').classList.add('hidden');
-    store.set('sd_lcode', $('code').value.trim());
-    store.set('sd_ccode', $('code').value.trim());
-    store.set('sd_cname', store.get('sd_cname', '') || teamName(Number($('alertTeam').value)));
-    renderChatId();
+    $(‘alertForm’).classList.add(‘hidden’);
   } catch (e) {
-    $('alertErr').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+    $(‘alertErr’).innerHTML = ‘<div class="msg err">’ + esc(e.message) + ‘</div>’;
   } finally {
     btn.disabled = false; renderAlerts();
   }
@@ -1132,34 +1109,15 @@ async function disableAlerts(){
   }
   renderAlerts();
 }
-let chatIdEditing = false;
 function renderChatId() {
   const card = $('chatIdCard');
   if (!card) return;
   card.classList.remove('hidden');
-  const teamNm = teamName(myRosterId()) || store.get('sd_cname', '');
-  const code = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
-  if (code && !chatIdEditing) {
-    card.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">' +
-      '<span style="font-size:14px">Chatting as <b>' + esc(teamNm || 'your team') + '</b> &middot; code saved</span>' +
-      '<button class="icon" onclick="chatIdEditing=true;renderChatId()">Edit</button>' +
-    '</div>';
-  } else {
-    card.innerHTML = (teamNm ? '<div style="font-size:14px;margin-bottom:10px">Chatting as <b>' + esc(teamNm) + '</b></div>' : '') +
-      '<label style="font:600 14px/1 var(--body);display:block;margin-bottom:6px">League code</label>' +
-      '<input id="chatCode" placeholder="Enter league code" type="password" value="' + esc(code) + '" maxlength="40" autocomplete="off" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:16px;box-sizing:border-box;margin-bottom:8px">' +
-      '<button class="primary" onclick="saveChatId()">Save</button>';
-  }
-}
-function saveChatId() {
-  const codeEl = $('chatCode');
-  const code = codeEl ? codeEl.value.trim() : '';
-  if (!code) { codeEl && codeEl.focus(); return; }
-  store.set('sd_ccode', code);
-  store.set('sd_lcode', code);
-  chatIdEditing = false;
-  renderChatId();
-  loadFeed();
+  const teamNm = teamName(myRosterId()) || store.get('sd_cname', '') || 'You';
+  card.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">' +
+    '<span style="font-size:14px">Chatting as <b>' + esc(teamNm) + '</b></span>' +
+    '<button class="icon" onclick="logout()">Sign out</button>' +
+  '</div>';
 }
 async function loadFeed(){
   if (!pushReady()) return;
@@ -1324,34 +1282,23 @@ function clearPendingImage(itemId) {
   if (fileEl) fileEl.value = '';
 }
 async function reactToComment(itemId, commentAt, emoji) {
-  const name = store.get('sd_cname', '') || teamName(myRosterId()) || '';
-  const code = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
-  if (!name || !code) { chatIdEditing = true; renderChatId(); $('chatIdCard').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  if (!store.get('sd_token', '')) { showLogin('Session expired. Please sign in again.'); return; }
   try {
-    const r = await fetch(workerUrl('/comments/' + itemId + '/react'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commentAt, emoji, name, code })
+    const r = await workerFetch('/comments/' + itemId + '/react', {
+      method: 'POST', body: JSON.stringify({ commentAt, emoji })
     });
+    if (r.status === 401) { showLogin('Session expired. Please sign in again.'); return; }
     if (!r.ok) return;
-    const comments = await r.json();
-    renderCommentList(itemId, comments);
+    renderCommentList(itemId, await r.json());
   } catch {}
 }
 async function submitComment(itemId) {
   const bodyEl = document.getElementById('cb-' + itemId);
   const sendEl = document.getElementById('cs-' + itemId);
   if (!bodyEl || !sendEl) return;
-  const name = store.get('sd_cname', '') || teamName(myRosterId()) || '';
-  const code = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
+  if (!store.get('sd_token', '')) { showLogin('Session expired. Please sign in again.'); return; }
   const body = bodyEl.value.trim();
   const pending = pendingImages[itemId];
-  if (!name || !code) {
-    chatIdEditing = !name || !code;
-    renderChatId();
-    $('chatIdCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return;
-  }
   if (!body && !pending) return;
   sendEl.disabled = true;
   sendEl.innerHTML = '<span style="font-size:11px;font-weight:600">...</span>';
@@ -1359,42 +1306,31 @@ async function submitComment(itemId) {
   if (pending) {
     try {
       const up = await fetch(UPLOAD_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, data: pending.dataUrl, name: pending.name })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: store.get('sd_token', ''), data: pending.dataUrl, name: pending.name })
       });
       if (up.ok) { const d = await up.json(); imageUrl = d.url || ''; }
-      else if (up.status === 403) { alert('Wrong league code.'); sendEl.disabled = false; sendEl.innerHTML = SEND_ICON; return; }
+      else if (up.status === 401) { showLogin('Session expired. Please sign in again.'); sendEl.disabled = false; sendEl.innerHTML = SEND_ICON; return; }
     } catch {}
   }
   try {
     const replyTo = replyTargets[itemId];
-    const payload = { name, code, body };
+    const payload = { body };
     if (imageUrl) payload.imageUrl = imageUrl;
     if (replyTo) payload.replyTo = replyTo;
-    const r = await fetch(workerUrl('/comments/' + itemId), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const r = await workerFetch('/comments/' + itemId, { method: 'POST', body: JSON.stringify(payload) });
     if (!r.ok) {
-      if (r.status === 403) alert('Wrong league code.');
+      if (r.status === 401) showLogin('Session expired. Please sign in again.');
       else alert('Could not post. Try again.');
-      sendEl.disabled = false;
-      sendEl.innerHTML = SEND_ICON;
-      return;
+      sendEl.disabled = false; sendEl.innerHTML = SEND_ICON; return;
     }
-    const comments = await r.json();
     bodyEl.value = '';
-    clearPendingImage(itemId);
-    clearReply(itemId);
-    sendEl.disabled = false;
-    sendEl.innerHTML = SEND_ICON;
-    renderCommentList(itemId, comments);
+    clearPendingImage(itemId); clearReply(itemId);
+    sendEl.disabled = false; sendEl.innerHTML = SEND_ICON;
+    renderCommentList(itemId, await r.json());
   } catch {
     alert('Could not post. Try again.');
-    sendEl.disabled = false;
-    sendEl.innerHTML = SEND_ICON;
+    sendEl.disabled = false; sendEl.innerHTML = SEND_ICON;
   }
 }
 /* ---------- money ---------- */
@@ -1887,9 +1823,8 @@ function showTab(name){
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => showTab(t.dataset.tab));
 
 S.cfg = store.get('sd_cfg', {});
-if (S.cfg.leagueId) boot();
-else if (LEAGUE_ID) pickTeam();
-else showSetup();
+if (store.get('sd_token', '') && S.cfg.leagueId) boot();
+else showLogin();
 
 if (location.hash === '#roasts') {
   setTimeout(() => { const el = $('roasts'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 800);
