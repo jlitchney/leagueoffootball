@@ -105,7 +105,8 @@ button{cursor:pointer}
 .setup h1{font:800 44px/1 var(--display);margin:28px 0 6px;letter-spacing:-.3px}
 .setup p{color:var(--muted);margin:0 0 18px}
 .setup label{display:block;font-weight:600;margin-bottom:6px}
-.setup input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:16px}
+.setup select,.setup input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:16px;margin-bottom:14px}
+.setup select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235B6475' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
 .primary{margin-top:12px;width:100%;padding:12px;border:0;border-radius:10px;background:var(--me);color:#fff;font-weight:600;font-size:16px}
 .choices{display:grid;gap:8px;margin-top:14px}
 .choices button{text-align:left;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
@@ -325,18 +326,18 @@ button{cursor:pointer}
     <p>Sign in to see your matchup.</p>
     <div id="loginBox">
       <label for="loginUser">Your team</label>
-      <select id="loginUser" style="font-size:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)">
+      <select id="loginUser">
         <option value="">Pick your team…</option>
-        <option>67MasterOogway</option>
-        <option>EvilGooberGibbs</option>
-        <option>GrandmaAngie1</option>
-        <option>I didnt hear no bell</option>
-        <option>LEGENDARY WILHELM</option>
-        <option>Lloyd Christmas</option>
-        <option>MERICATHEGREAT</option>
-        <option>My team sucks😭😭😭</option>
-        <option>Sneakypeeky</option>
-        <option>This name helps me win</option>
+        <option value="4">67MasterOogway</option>
+        <option value="9">EvilGooberGibbs</option>
+        <option value="10">GrandmaAngie1</option>
+        <option value="1">I didnt hear no bell</option>
+        <option value="2">LEGENDARY WILHELM</option>
+        <option value="3">Lloyd Christmas</option>
+        <option value="7">MERICATHEGREAT</option>
+        <option value="8">My team sucks😭😭😭</option>
+        <option value="5">Sneakypeeky</option>
+        <option value="6">This name helps me win</option>
       </select>
       <label for="loginPw">Password</label>
       <input id="loginPw" type="password" autocomplete="current-password" placeholder="Password" style="font-size:16px">
@@ -499,13 +500,31 @@ function optimalScore(m) {
 function showLogin(msg) {
   $(‘app’).classList.add(‘hidden’); $(‘setup’).classList.remove(‘hidden’);
   if ($(‘loginMsg’)) $(‘loginMsg’).innerHTML = msg ? ‘<div class=”msg err”>’ + esc(msg) + ‘</div>’ : ‘’;
+  refreshTeamNames();
+}
+async function refreshTeamNames() {
+  try {
+    const [users, rosters] = await Promise.all([
+      j(SL + ‘/league/’ + LEAGUE_ID + ‘/users’),
+      j(SL + ‘/league/’ + LEAGUE_ID + ‘/rosters’)
+    ]);
+    const userMap = Object.fromEntries(users.map(u => [u.user_id, u]));
+    const sel = $(‘loginUser’);
+    if (!sel) return;
+    for (const r of rosters) {
+      const u = userMap[r.owner_id] || {};
+      const name = r.metadata?.team_name || u.metadata?.team_name || u.display_name || (‘Team ‘ + r.roster_id);
+      const opt = sel.querySelector(‘option[value=”’ + r.roster_id + ‘”]’);
+      if (opt) opt.textContent = name;
+    }
+  } catch {}
 }
 async function doLogin() {
-  const usernameEl = $(‘loginUser’), pwEl = $(‘loginPw’), btn = $(‘loginBtn’);
-  const username = usernameEl?.value.trim() || ‘’;
+  const selEl = $(‘loginUser’), pwEl = $(‘loginPw’), btn = $(‘loginBtn’);
+  const rosterId = Number(selEl?.value);
   const password = pwEl?.value || ‘’;
-  if (!username || !password) {
-    if (!username) $(‘loginMsg’).innerHTML = ‘<div class=”msg err”>Pick your team.</div>’;
+  if (!rosterId || !password) {
+    if (!rosterId) $(‘loginMsg’).innerHTML = ‘<div class=”msg err”>Pick your team.</div>’;
     return;
   }
   btn.disabled = true;
@@ -513,7 +532,7 @@ async function doLogin() {
   try {
     const r = await fetch(workerUrl(‘/auth/login’), {
       method: ‘POST’, headers: { ‘Content-Type’: ‘application/json’ },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ rosterId, password })
     });
     if (!r.ok) throw new Error(r.status === 401 ? ‘Wrong team name or password.’ : ‘Sign in failed. Try again.’);
     const data = await r.json();
@@ -1840,6 +1859,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => showTab(t.datas
 try {
   S.cfg = store.get('sd_cfg', {});
   if (store.get('sd_token', '') && S.cfg.leagueId) boot();
+  else refreshTeamNames();
 } catch (e) { /* login form already visible by default */ }
 
 if (location.hash === '#roasts') {
