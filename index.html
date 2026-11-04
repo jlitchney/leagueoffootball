@@ -1133,7 +1133,7 @@ async function loadFeed(){
     };
     const savedName = store.get('sd_cname', '') || teamName(myRosterId()) || '';
     const savedCode = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
-    const hasCreds = !!(savedName && savedCode);
+    const hasCreds = !!savedCode;
     const byWeek = {};
     items.slice(0, 40).forEach(i => { const wk = i.week || 0; (byWeek[wk] ||= []).push(i); });
     const weeks = Object.keys(byWeek).map(Number).sort((a, b) => b - a);
