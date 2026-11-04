@@ -1092,6 +1092,8 @@ async function enableAlerts(){
       throw new Error(res.status === 403 ? 'That league code isn’t right.' : `Couldn’t save alerts (error ${res.status}). Try again.`);
     }
     $('alertForm').classList.add('hidden');
+    store.set('sd_lcode', $('code').value.trim());
+    store.set('sd_cname', store.get('sd_cname', '') || teamName(Number($('alertTeam').value)));
   } catch (e) {
     $('alertErr').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
   } finally {
@@ -1181,8 +1183,8 @@ async function loadComments(itemId) {
 function renderComments(itemId, comments) {
   const el = document.getElementById('ct-' + itemId);
   if (!el) return;
-  const savedName = store.get('sd_cname', '');
-  const savedCode = store.get('sd_ccode', '');
+  const savedName = store.get('sd_cname', '') || teamName(myRosterId()) || '';
+  const savedCode = store.get('sd_ccode', '') || store.get('sd_lcode', '') || '';
   let html = '';
   for (const c of comments) {
     const initials = c.ai ? 'TC' : c.name.trim().slice(0, 2).toUpperCase();
