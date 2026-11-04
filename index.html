@@ -166,6 +166,11 @@ button{cursor:pointer}
 .cimg-prev img{max-height:80px;max-width:200px;border-radius:8px;border:1px solid var(--line);display:block}
 .cimg-prev-rm{position:absolute;top:-7px;right:-7px;width:18px;height:18px;border-radius:50%;background:#333;color:#fff;border:0;font-size:12px;line-height:18px;text-align:center;padding:0;cursor:pointer}
 .cmt-img{max-width:100%;border-radius:10px;margin-top:5px;border:1px solid var(--line);display:block;cursor:pointer}
+.cmt-reply-btn{background:none;border:0;padding:0 4px;color:var(--muted);font-size:11px;cursor:pointer;opacity:.7}
+.cmt-reply-btn:hover,.cmt-reply-btn:active{opacity:1}
+.cmt-quote{background:var(--turf-soft);border-left:3px solid var(--muted);border-radius:4px;padding:3px 8px;font-size:12px;color:var(--muted);margin-bottom:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.creply-bar{display:none;background:var(--turf-soft);border-radius:8px;padding:5px 10px;margin-top:4px;font-size:12px;color:var(--muted);align-items:center;gap:6px}
+.creply-bar button{background:none;border:0;padding:0;cursor:pointer;color:var(--muted);font-size:16px;margin-left:auto;line-height:1}
 /* champions: styled after the trophy's engraved plaques */
 .hall{margin-top:26px}
 .hall h2{font:800 30px/1 var(--display);margin:0 0 4px;letter-spacing:-.2px}
@@ -1167,14 +1172,15 @@ async function loadFeed(){
               '<div id="cco-' + iid + '"></div>' +
               (hasCreds ? '' :
                 '<div class="cform-meta" style="margin-top:6px">' +
-                  '<input class="cinput" id="cn-' + iid + '" placeholder="Your name" value="' + esc(savedName) + '" maxlength="40">' +
-                  '<input class="cinput" id="cc-' + iid + '" placeholder="League code" type="password" value="' + esc(savedCode) + '" maxlength="40">' +
+                  '<input class="cinput" id="cn-' + iid + '" placeholder="Your name" value="' + esc(savedName) + '" maxlength="40" onblur="var v=this.value.trim();if(v)store.set(\'sd_cname\',v)">' +
+                  '<input class="cinput" id="cc-' + iid + '" placeholder="League code" type="password" value="' + esc(savedCode) + '" maxlength="40" onblur="var v=this.value.trim();if(v){store.set(\'sd_ccode\',v);store.set(\'sd_lcode\',v)}">' +
                 '</div>'
               ) +
+              '<div id="crb-' + iid + '" class="creply-bar"></div>' +
               '<div style="display:flex;gap:6px;align-items:flex-end;margin-top:6px">' +
                 '<input type="file" accept="image/*,image/heic" id="cfi-' + iid + '" style="display:none" onchange="onImgPicked(\'' + iid + '\')">' +
                 '<button class="cimg-btn" onclick="document.getElementById(\'cfi-' + iid + '\').click()" title="Attach image" aria-label="Attach image">' + CAMERA_ICON + '</button>' +
-                '<textarea class="ctextarea" id="cb-' + iid + '" placeholder="Message..." rows="1" maxlength="500" style="flex:1"></textarea>' +
+                '<textarea class="ctextarea" id="cb-' + iid + '" placeholder="Message..." rows="1" maxlength="500" style="flex:1" onfocus="setTimeout(()=>this.scrollIntoView({behavior:\'smooth\',block:\'nearest\'}),350)"></textarea>' +
                 '<button class="csend" onclick="submitComment(\'' + iid + '\')" id="cs-' + iid + '" aria-label="Send">' + SEND_ICON + '</button>' +
               '</div>' +
               '<div id="cip-' + iid + '" class="cimg-prev" style="display:none"></div>' +
@@ -1198,6 +1204,27 @@ const SEND_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" s
 const CAMERA_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 const RXN_EMOJIS = ['❤️', '👍', '😂', '🔥', '💀', '👎'];
 const pendingImages = {};
+const replyTargets = {};
+const cmtData = {};
+function setReplyFromData(itemId, key) {
+  const d = cmtData[key];
+  if (d) setReply(itemId, d.name, d.body);
+}
+function setReply(itemId, name, snippet) {
+  replyTargets[itemId] = { name, snippet };
+  const bar = document.getElementById('crb-' + itemId);
+  if (!bar) return;
+  bar.innerHTML = '<span>&#8617; <b>' + esc(name) + '</b>: ' + esc(snippet.slice(0, 70)) + (snippet.length > 70 ? '&#8230;' : '') + '</span>' +
+    '<button onclick="clearReply(\'' + itemId + '\')">&#10005;</button>';
+  bar.style.display = 'flex';
+  const ta = document.getElementById('cb-' + itemId);
+  if (ta) { ta.focus(); }
+}
+function clearReply(itemId) {
+  delete replyTargets[itemId];
+  const bar = document.getElementById('crb-' + itemId);
+  if (bar) { bar.innerHTML = ''; bar.style.display = 'none'; }
+}
 async function loadComments(itemId) {
   try {
     const comments = await j(workerUrl('/comments/' + itemId));
@@ -1214,13 +1241,20 @@ function renderCommentList(itemId, comments) {
     const rxns = c.reactions || {};
     const rxnKeys = Object.keys(rxns).filter(e => rxns[e]?.length);
     const pickerId = 'rxnp-' + itemId + '-' + c.at;
+    const cmtKey = itemId + '-' + c.at;
+    const cName = c.ai ? 'Roaster' : c.name;
+    cmtData[cmtKey] = { name: cName, body: c.body || '' };
     html += '<div class="cmt' + (c.ai ? ' cmt-ai' : '') + '">' +
       '<div class="cmt-av">' + esc(initials) + '</div>' +
       '<div style="flex:1;min-width:0">' +
-        '<div class="cmt-name">' + esc(c.ai ? 'Roaster' : c.name) + '</div>' +
+        '<div class="cmt-name">' + esc(cName) + '</div>' +
+        (c.replyTo ? '<div class="cmt-quote">&#8617; <b>' + esc(c.replyTo.name) + '</b>: ' + esc(String(c.replyTo.snippet || '').slice(0, 80)) + '</div>' : '') +
         (c.body ? '<div class="cmt-text">' + esc(c.body) + '</div>' : '') +
         (c.imageUrl ? '<img class="cmt-img" src="' + esc(c.imageUrl) + '" alt="image" loading="lazy" onclick="window.open(this.src)">' : '') +
-        '<div class="cmt-time">' + ago(c.at) + '</div>' +
+        '<div style="display:flex;align-items:center;gap:4px">' +
+          '<div class="cmt-time">' + ago(c.at) + '</div>' +
+          '<button class="cmt-reply-btn" onclick="setReplyFromData(\'' + itemId + '\',\'' + cmtKey + '\')">&#8617; reply</button>' +
+        '</div>' +
         '<div class="rxns">' +
           rxnKeys.map(e => {
             const mine = rxns[e].includes(myName);
@@ -1293,6 +1327,7 @@ async function submitComment(itemId) {
   if (!name || !code || (!body && !pending)) { alert('Fill in your name, the league code, and a message or image.'); return; }
   store.set('sd_cname', name);
   store.set('sd_ccode', code);
+  store.set('sd_lcode', code);
   sendEl.disabled = true;
   sendEl.innerHTML = '<span style="font-size:11px;font-weight:600">...</span>';
   let imageUrl = '';
@@ -1308,8 +1343,10 @@ async function submitComment(itemId) {
     } catch {}
   }
   try {
+    const replyTo = replyTargets[itemId];
     const payload = { name, code, body };
     if (imageUrl) payload.imageUrl = imageUrl;
+    if (replyTo) payload.replyTo = replyTo;
     const r = await fetch(workerUrl('/comments/' + itemId), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1325,6 +1362,7 @@ async function submitComment(itemId) {
     const comments = await r.json();
     bodyEl.value = '';
     clearPendingImage(itemId);
+    clearReply(itemId);
     sendEl.disabled = false;
     sendEl.innerHTML = SEND_ICON;
     renderCommentList(itemId, comments);
