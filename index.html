@@ -144,7 +144,7 @@ button{cursor:pointer}
 .cmt-av{width:26px;height:26px;border-radius:50%;background:var(--turf-soft);flex-shrink:0;display:flex;align-items:center;justify-content:center;font:700 10px/1 var(--body);color:var(--muted)}
 .cmt-ai .cmt-av{background:var(--accent);color:#fff}
 .cmt-name{font:600 12px/1 var(--body);margin-bottom:3px}
-.cmt-text{font-size:13px;line-height:1.4}
+.cmt-text{font-size:13px;line-height:1.4;white-space:pre-line}
 .cmt-time{font-size:11px;color:var(--muted);margin-top:2px}
 .cform{padding:6px 0}
 .cform-meta{display:flex;gap:5px;margin-bottom:5px}
@@ -1198,7 +1198,7 @@ async function loadFeed(){
               '<div class="cform-row" style="display:flex;gap:6px;align-items:flex-end">' +
                 '<input type="file" accept="image/*,image/heic" id="cfi-' + iid + '" style="display:none" onchange="onImgPicked(\'' + iid + '\')">' +
                 '<button class="cimg-btn" onclick="document.getElementById(\'cfi-' + iid + '\').click()" title="Attach image" aria-label="Attach image">' + CAMERA_ICON + '</button>' +
-                '<textarea class="ctextarea" id="cb-' + iid + '" placeholder="Message..." rows="1" maxlength="500" style="flex:1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" onfocus="chatFocus(this)" onblur="chatBlur(this)"></textarea>' +
+                '<textarea class="ctextarea" id="cb-' + iid + '" placeholder="Message..." rows="1" maxlength="500" style="flex:1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'" onfocus="chatFocus(this)" onblur="chatBlur(this)" onkeydown="chatKeydown(event,\'' + iid + '\')"></textarea>' +
                 '<button class="csend" onclick="submitComment(\'' + iid + '\')" id="cs-' + iid + '" aria-label="Send">' + SEND_ICON + '</button>' +
               '</div>' +
               '<div id="cip-' + iid + '" class="cimg-prev" style="display:none"></div>' +
@@ -1345,7 +1345,8 @@ async function submitComment(itemId) {
       });
       if (up.ok) { const d = await up.json(); imageUrl = d.url || ''; }
       else if (up.status === 401) { showLogin('Session expired. Please sign in again.'); sendEl.disabled = false; sendEl.innerHTML = SEND_ICON; return; }
-    } catch {}
+      else { alert('Image upload failed. Remove it and try again.'); sendEl.disabled = false; sendEl.innerHTML = SEND_ICON; return; }
+    } catch { alert('Image upload failed. Remove it and try again.'); sendEl.disabled = false; sendEl.innerHTML = SEND_ICON; return; }
   }
   try {
     const replyTo = replyTargets[itemId];
@@ -1359,6 +1360,7 @@ async function submitComment(itemId) {
       sendEl.disabled = false; sendEl.innerHTML = SEND_ICON; return;
     }
     bodyEl.value = ''; bodyEl.style.height = '';
+    bodyEl.blur();
     clearPendingImage(itemId); clearReply(itemId);
     sendEl.disabled = false; sendEl.innerHTML = SEND_ICON;
     renderCommentList(itemId, await r.json());
@@ -1866,6 +1868,9 @@ if (location.hash === '#roasts') {
   setTimeout(() => { const el = $('roasts'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 800);
 }
 
+function chatKeydown(e, iid) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(iid); }
+}
 function chatFocus(ta) {
   const row = ta.closest('.cform-row');
   if (!row || row.classList.contains('chatpinned')) return;
