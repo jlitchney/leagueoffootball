@@ -894,16 +894,16 @@ async function boot(){
   }
 }
 
-$('loginBtn').onclick = doLogin;
-$('loginPw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-$('loginUser').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginPw').focus(); });
-$('prev').onclick = () => setWeek(S.week - 1);
-$('next').onclick = () => setWeek(S.week + 1);
-$('refresh').onclick = () => tick();
-$('myMatchupBtn').onclick = () => { const p = pairs().find(pair => pair.some(m => m.roster_id === myRosterId())); if (p) { S.sel = p[0].matchup_id; render(); } };
+$('loginBtn')?.addEventListener('click', doLogin);
+$('loginPw')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+$('loginUser')?.addEventListener('keydown', e => { if (e.key === 'Enter') $('loginPw')?.focus(); });
+if ($('prev')) $('prev').onclick = () => setWeek(S.week - 1);
+if ($('next')) $('next').onclick = () => setWeek(S.week + 1);
+if ($('refresh')) $('refresh').onclick = () => tick();
+if ($('myMatchupBtn')) $('myMatchupBtn').onclick = () => { const p = pairs().find(pair => pair.some(m => m.roster_id === myRosterId())); if (p) { S.sel = p[0].matchup_id; render(); } };
 let _tx0 = 0, _ty0 = 0;
-$('main').addEventListener('touchstart', e => { _tx0 = e.touches[0].clientX; _ty0 = e.touches[0].clientY; }, { passive: true });
-$('main').addEventListener('touchend', e => {
+$('main')?.addEventListener('touchstart', e => { _tx0 = e.touches[0].clientX; _ty0 = e.touches[0].clientY; }, { passive: true });
+$('main')?.addEventListener('touchend', e => {
   const dx = e.changedTouches[0].clientX - _tx0;
   const dy = e.changedTouches[0].clientY - _ty0;
   if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
@@ -1811,20 +1811,22 @@ function renderMoney(){
   renderMoves();
 }
 
-$('enableAlerts').onclick = enableAlerts;
+if ($('enableAlerts')) $('enableAlerts').onclick = enableAlerts;
 initPush();
 
 function showTab(name){
   document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('page-'+name).classList.remove('hidden');
-  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+  document.getElementById('page-'+name)?.classList.remove('hidden');
+  document.querySelector(`.tab[data-tab="${name}"]`)?.classList.add('active');
 }
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => showTab(t.dataset.tab));
 
-S.cfg = store.get('sd_cfg', {});
-if (store.get('sd_token', '') && S.cfg.leagueId) boot();
-else showLogin();
+try {
+  S.cfg = store.get('sd_cfg', {});
+  if (store.get('sd_token', '') && S.cfg.leagueId) boot();
+  else showLogin();
+} catch (e) { showLogin(); }
 
 if (location.hash === '#roasts') {
   setTimeout(() => { const el = $('roasts'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 800);
