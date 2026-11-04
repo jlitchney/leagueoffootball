@@ -320,12 +320,12 @@ button{cursor:pointer}
 <body>
 <div class="wrap">
 
-  <section id="setup" class="setup hidden">
+  <section id="setup" class="setup">
     <h1>The League</h1>
-    <p>Sign in with your team name and password.</p>
+    <p>Sign in to see your matchup.</p>
     <div id="loginBox">
-      <label for="loginUser">Team name</label>
-      <input id="loginUser" autocomplete="username" autocapitalize="words" spellcheck="false" placeholder="e.g. Thunder Chickens" style="font-size:16px">
+      <label for="loginUser">Your team</label>
+      <select id="loginUser" style="font-size:16px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)"><option value="">Loading teams…</option></select>
       <label for="loginPw">Password</label>
       <input id="loginPw" type="password" autocomplete="current-password" placeholder="Password" style="font-size:16px">
       <button class="primary" id="loginBtn">Sign in</button>
@@ -484,15 +484,38 @@ function optimalScore(m) {
 }
 
 /* ---------- setup ---------- */
+async function populateTeamSelect() {
+  const sel = $(‘loginUser’);
+  if (!sel || sel.options.length > 1) return;
+  try {
+    const [users, rosters] = await Promise.all([
+      j(SL + ‘/league/’ + LEAGUE_ID + ‘/users’),
+      j(SL + ‘/league/’ + LEAGUE_ID + ‘/rosters’)
+    ]);
+    const userMap = Object.fromEntries(users.map(u => [u.user_id, u]));
+    const teams = rosters.map(r => {
+      const u = userMap[r.owner_id] || {};
+      return r.metadata?.team_name || u.metadata?.team_name || u.display_name || (‘Team ‘ + r.roster_id);
+    }).sort((a, b) => a.localeCompare(b));
+    sel.innerHTML = ‘<option value=””>Pick your team…</option>’ +
+      teams.map(t => ‘<option value=”’ + esc(t) + ‘”>’ + esc(t) + ‘</option>’).join(‘’);
+  } catch {
+    sel.innerHTML = ‘<option value=””>Couldn\’t load teams — type your team name</option>’;
+  }
+}
 function showLogin(msg) {
   $(‘app’).classList.add(‘hidden’); $(‘setup’).classList.remove(‘hidden’);
   if ($(‘loginMsg’)) $(‘loginMsg’).innerHTML = msg ? ‘<div class=”msg err”>’ + esc(msg) + ‘</div>’ : ‘’;
+  populateTeamSelect();
 }
 async function doLogin() {
   const usernameEl = $(‘loginUser’), pwEl = $(‘loginPw’), btn = $(‘loginBtn’);
   const username = usernameEl?.value.trim() || ‘’;
   const password = pwEl?.value || ‘’;
-  if (!username || !password) return;
+  if (!username || !password) {
+    if (!username) $(‘loginMsg’).innerHTML = ‘<div class=”msg err”>Pick your team.</div>’;
+    return;
+  }
   btn.disabled = true;
   $(‘loginMsg’).innerHTML = ‘<div class=”msg”>Signing in…</div>’;
   try {
@@ -1825,8 +1848,8 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => showTab(t.datas
 try {
   S.cfg = store.get('sd_cfg', {});
   if (store.get('sd_token', '') && S.cfg.leagueId) boot();
-  else showLogin();
-} catch (e) { showLogin(); }
+  else { populateTeamSelect(); }
+} catch (e) { /* login form already visible by default */ }
 
 if (location.hash === '#roasts') {
   setTimeout(() => { const el = $('roasts'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 800);
