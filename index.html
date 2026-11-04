@@ -1079,8 +1079,9 @@ async function loadFeed(){
   if (!pushReady()) return;
   try {
     const items = await j(workerUrl('/feed'));
+    const fmtBody = s => esc(s).replace(/\n/g, '<br>');
     $('feed').innerHTML = items.length
-      ? items.slice(0, 12).map(i => `<li><b>${esc(i.title)}</b>${esc(i.body)}<br><time>${ago(i.at)}</time></li>`).join('')
+      ? items.slice(0, 12).map(i => `<li><b>${esc(i.title)}</b><br>${fmtBody(i.body)}<br><time>${ago(i.at)}</time></li>`).join('')
       : '<li>No roasts yet. They start once games kick off.</li>';
   } catch {}
 }
@@ -1584,6 +1585,10 @@ S.cfg = store.get('sd_cfg', {});
 if (S.cfg.leagueId) boot();
 else if (LEAGUE_ID) pickTeam();
 else showSetup();
+
+if (location.hash === '#roasts') {
+  setTimeout(() => { const el = $('roasts'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 800);
+}
 </script>
 </body>
 </html>
