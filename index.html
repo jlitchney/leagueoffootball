@@ -2006,7 +2006,6 @@ function openChat(focusInput) {
   document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   $('page-chat').classList.remove('hidden');
-  $('btm-chat')?.classList.add('btm-bar-new');
   if (!_feedItemsKey) loadFeed();
   if (focusInput) {
     setTimeout(() => { const ta = $('chat-cb'); if (ta) ta.focus(); }, 300);
@@ -2015,7 +2014,6 @@ function openChat(focusInput) {
   }
 }
 function closeChat() {
-  $('btm-chat')?.classList.remove('btm-bar-new');
   showTab(_prevTab || 'score');
 }
 function setChatReply(itemId, cmtKey) {
