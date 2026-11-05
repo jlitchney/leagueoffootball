@@ -471,7 +471,7 @@ button{cursor:pointer}
         </div>
         <div style="padding:0 14px 10px">
           <textarea class="ctextarea" id="nm-cb" placeholder="Message the group…" rows="3" maxlength="500" style="width:100%" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitNewMsg()}"></textarea>
-          <button class="primary" id="nm-send" onclick="submitNewMsg()">Send</button>
+          <button class="primary" id="nm-send" onclick="submitNewMsg()" style="background:#007AFF">Send</button>
         </div>
       </div>
     </div>
@@ -1158,6 +1158,19 @@ async function initPush(){
   }
   renderAlerts();
   renderChatId();
+  autoResubscribe();
+}
+async function autoResubscribe(){
+  if (!canPush() || Notification.permission !== 'granted') return;
+  try {
+    const sub = await currentSub();
+    if (sub) return;
+    const reg = swReg || await navigator.serviceWorker.ready;
+    const newSub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(PUSH.vapidPublicKey) });
+    const res = await workerFetch('/subscribe', { method: 'POST', body: JSON.stringify({ subscription: newSub.toJSON() }) });
+    if (!res.ok) await newSub.unsubscribe();
+    else renderAlerts();
+  } catch {}
 }
 async function currentSub(){
   try { return swReg ? await swReg.pushManager.getSubscription() : null; } catch { return null; }
