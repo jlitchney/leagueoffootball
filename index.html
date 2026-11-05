@@ -204,13 +204,17 @@ button{cursor:pointer}
 /* roast card in chat */
 .chat-roast{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;margin:14px 0 4px}
 .chat-roast-title{font:600 14px/1.3 var(--body);margin:4px 0 6px}
-.chat-roast-body{font-size:14px;line-height:1.5;color:var(--ink)}
+.chat-roast-body{font-size:14px;line-height:1.5;color:var(--ink);white-space:pre-line}
 .chat-roast-more{background:none;border:0;color:#007AFF;font:inherit;font-size:14px;cursor:pointer;padding:0}
 .chat-roast-time{font-size:11px;color:var(--muted);margin-top:5px}
 /* chat global input bar */
 .chat-input-bar{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 52px);z-index:150;background:var(--bg);border-top:1px solid var(--line);padding:6px 14px;box-sizing:border-box}
 .chat-reply-preview{display:none;background:var(--turf-soft);border-radius:8px;padding:5px 10px;margin-bottom:4px;font-size:12px;color:var(--muted);align-items:center;gap:6px}
 .chat-reply-preview button{background:none;border:0;padding:0;cursor:pointer;color:var(--muted);font-size:16px;margin-left:auto;line-height:1}
+.modal-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.45);display:flex;align-items:flex-end}
+.modal-sheet{background:var(--bg);border-radius:20px 20px 0 0;padding:0 0 calc(env(safe-area-inset-bottom,0px) + 10px);width:100%;max-height:60vh}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px;font:700 17px/1 var(--body)}
+.modal-hdr button{background:none;border:0;font-size:22px;padding:0;color:var(--muted);line-height:1;cursor:pointer}
 /* champions: styled after the trophy's engraved plaques */
 .hall{margin-top:26px}
 .hall h2{font:800 30px/1 var(--display);margin:0 0 4px;letter-spacing:-.2px}
@@ -458,7 +462,19 @@ button{cursor:pointer}
     </div>
     <div class="btm-bar" id="btm-bar">
       <button class="btm-bar-btn" id="btm-chat" onclick="openChat(false)">💬 Group Chat</button>
-      <button class="btm-bar-btn btm-bar-new" onclick="openChat(true)">✏️ New Message</button>
+      <button class="btm-bar-btn btm-bar-new" onclick="openNewMsg()">✏️ New Message</button>
+    </div>
+    <div class="modal-overlay hidden" id="new-msg-modal" onclick="if(event.target===this)closeNewMsg()">
+      <div class="modal-sheet">
+        <div class="modal-hdr">
+          <span>New Message</span>
+          <button onclick="closeNewMsg()">&#10005;</button>
+        </div>
+        <div style="padding:0 14px 10px">
+          <textarea class="ctextarea" id="nm-cb" placeholder="Message the group…" rows="3" maxlength="500" style="width:100%" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitNewMsg()}"></textarea>
+          <button class="primary" id="nm-send" onclick="submitNewMsg()">Send</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -2072,6 +2088,37 @@ async function submitChatComment() {
     alert('Could not post. Try again.');
     sendEl.disabled = false; sendEl.innerHTML = SEND_ICON;
   }
+}
+function openNewMsg() {
+  if (!$('chat-input-bar')?.dataset.iid) loadFeed();
+  $('new-msg-modal')?.classList.remove('hidden');
+  setTimeout(() => $('nm-cb')?.focus(), 150);
+}
+function closeNewMsg() {
+  $('new-msg-modal')?.classList.add('hidden');
+}
+async function submitNewMsg() {
+  const iid = $('chat-input-bar')?.dataset.iid;
+  if (!iid) return;
+  const bodyEl = $('nm-cb');
+  const btn = $('nm-send');
+  if (!bodyEl) return;
+  const body = bodyEl.value.trim();
+  if (!body) return;
+  if (!store.get('sd_token', '')) { showLogin('Session expired. Please sign in again.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const r = await workerFetch('/comments/' + iid, { method: 'POST', body: JSON.stringify({ body }) });
+    if (!r.ok) {
+      if (r.status === 401) showLogin('Session expired. Please sign in again.');
+      else alert('Could not send. Try again.');
+    } else {
+      renderCommentList(iid, await r.json());
+      bodyEl.value = ''; bodyEl.style.height = '';
+      closeNewMsg();
+    }
+  } catch { alert('Could not send. Try again.'); }
+  if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
 }
 function chatKeydown(e, iid) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment(iid); }
