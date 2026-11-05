@@ -423,7 +423,6 @@ button{cursor:pointer}
           <div id="alertErr"></div>
         </div>
         <div class="alertForm hidden" id="chatIdCard"></div>
-        <button class="primary" style="margin-top:10px" onclick="openChat(false)">Open Group Chat →</button>
       </section>
       <p class="note">
         Live projection = points so far + pregame projection × share of game left.
@@ -455,7 +454,7 @@ button{cursor:pointer}
         <div style="display:flex;gap:6px;align-items:flex-end">
           <input type="file" accept="image/*,image/heic" id="chat-cfi" style="display:none" onchange="onChatImgPicked()">
           <button class="cimg-btn" onclick="$('chat-cfi').click()" title="Attach image" aria-label="Attach image"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
-          <textarea class="ctextarea" id="chat-cb" placeholder="iMessage" rows="1" maxlength="500" style="flex:1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitChatComment()}"></textarea>
+          <textarea class="ctextarea" id="chat-cb" placeholder="Message" rows="1" maxlength="500" style="flex:1" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitChatComment()}"></textarea>
           <button class="csend" id="chat-cs" onclick="submitChatComment()" aria-label="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5,12 12,5 19,12"/></svg></button>
         </div>
       </div>
