@@ -1248,9 +1248,7 @@ function startFeedRefresh() {
   feedRefreshTimer = setInterval(() => {
     if (document.visibilityState !== 'visible') return;
     const chatPage = $('page-chat');
-    if (chatPage && !chatPage.classList.contains('hidden')) {
-      _chatIids.forEach(iid => loadComments(iid));
-    }
+    if (chatPage && !chatPage.classList.contains('hidden')) loadFeed();
   }, 60000);
 }
 const chatBadge = t => {
@@ -1263,7 +1261,7 @@ const chatBadge = t => {
   if (t === 'starting_a_player_who_wont_play' || t === 'empty_starting_slot') return '<span class="fbadge fbadge-alert">LINEUP</span>';
   return '<span class="fbadge fbadge-recap">THE LEAGUE</span>';
 };
-function renderChatFeed(items) {
+function renderChatFeed(items, commentMap) {
   const el = $('chat-feed');
   if (!el) return;
   _chatIids = [];
@@ -1271,20 +1269,38 @@ function renderChatFeed(items) {
     el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:60px 20px;font-size:14px">No roasts yet.</div>';
     return;
   }
-  const byWeek = {};
-  items.slice(0, 40).forEach(i => { const wk = i.week || 0; (byWeek[wk] ||= []).push(i); });
-  const weeks = Object.keys(byWeek).map(Number).sort((a, b) => b - a);
-  let latestAt = 0;
-  items.forEach(i => { if (i.at > latestAt) latestAt = i.at; });
+
+  // Flatten feed items + their comments into one chronological timeline
+  const timeline = [];
+  for (const item of items.slice(0, 40)) {
+    const iid = String(item.at);
+    _chatIids.push(iid);
+    timeline.push({ kind: 'roast', at: item.at, iid, item });
+    for (const c of (commentMap[iid] || [])) {
+      timeline.push({ kind: 'comment', at: c.at, iid, comment: c });
+    }
+  }
+  timeline.sort((a, b) => a.at - b.at);
+
+  const latestAt = items.reduce((mx, i) => i.at > mx ? i.at : mx, 0);
+  const myName = store.get('sd_cname', '') || teamName(myRosterId()) || '';
+  const TRUNC = 160;
   let html = '';
-  for (const wk of weeks) {
-    const wkItems = byWeek[wk];
-    if (wk) html += '<div class="chat-day">— Week ' + wk + ' —</div>';
-    for (const i of wkItems) {
-      const iid = String(i.at);
-      _chatIids.push(iid);
+  let prevDay = '';
+  let prevBubbleSender = '';
+
+  for (const entry of timeline) {
+    const dayStr = new Date(entry.at).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    if (dayStr !== prevDay) {
+      html += '<div class="chat-day">' + esc(dayStr) + '</div>';
+      prevDay = dayStr;
+      prevBubbleSender = '';
+    }
+
+    if (entry.kind === 'roast') {
+      prevBubbleSender = '';
+      const i = entry.item, iid = entry.iid;
       const body = i.body || '';
-      const TRUNC = 160;
       const isLong = body.length > TRUNC + 30;
       const bodyHtml = isLong
         ? esc(body.slice(0, TRUNC)) + '<span id="chat-more-' + iid + '" style="display:none">' + esc(body.slice(TRUNC)) + '</span><button class="chat-roast-more" id="chat-morebtn-' + iid + '" onclick="toggleRoastMore(\'' + iid + '\')">… more</button>'
@@ -1294,14 +1310,54 @@ function renderChatFeed(items) {
         '<div class="chat-roast-title">' + esc(i.title) + '</div>' +
         '<div class="chat-roast-body">' + bodyHtml + '</div>' +
         '<div class="chat-roast-time">' + ago(i.at) + '</div>' +
-        '</div>' +
-        '<div id="chat-cco-' + iid + '"></div>';
+        '</div>';
+    } else {
+      const c = entry.comment, iid = entry.iid;
+      const cName = c.ai ? 'Roaster' : c.name;
+      const isMe = !c.ai && c.name === myName;
+      const rxns = c.reactions || {};
+      const rxnKeys = Object.keys(rxns).filter(e => rxns[e]?.length);
+      const pickerId = 'rxnp-' + iid + '-' + c.at;
+      const cmtKey = iid + '-' + c.at;
+      cmtData[cmtKey] = { name: cName, body: c.body || '' };
+      if (c.ai) {
+        prevBubbleSender = '';
+        html += '<div class="chat-roast" style="margin:4px 0;padding:8px 12px"><div style="font-size:13px;color:var(--muted)"><b>Roaster:</b> ' + esc(c.body) + '</div></div>';
+        continue;
+      }
+      const showSender = !isMe && cName !== prevBubbleSender;
+      prevBubbleSender = isMe ? '' : cName;
+      html += '<div class="msg-row ' + (isMe ? 'me' : 'them') + '">';
+      if (showSender) html += '<div class="msg-sender">' + esc(cName) + '</div>';
+      html += '<div class="bubble ' + (isMe ? 'bubble-me' : 'bubble-them') + '">';
+      if (c.replyTo) html += '<div class="bubble-quote">&#8617; <b>' + esc(c.replyTo.name) + '</b>: ' + esc(String(c.replyTo.snippet || '').slice(0, 60)) + '</div>';
+      if (c.body) html += esc(c.body);
+      if (c.imageUrl) html += '<img class="cmt-img" src="' + esc(c.imageUrl) + '" alt="" onclick="window.open(this.src)" style="margin-top:4px;border-color:transparent">';
+      html += '</div>';
+      if (rxnKeys.length) {
+        html += '<div class="bubble-rxns"' + (isMe ? ' style="justify-content:flex-end"' : '') + '>' +
+          rxnKeys.map(e => {
+            const mine = rxns[e].includes(myName);
+            return '<button class="rxn-pill' + (mine ? ' mine' : '') + '" title="' + esc(rxns[e].join(', ')) + '" onclick="reactToComment(\'' + iid + '\',' + c.at + ',\'' + e + '\')">' + e + ' <span>' + rxns[e].length + '</span></button>';
+          }).join('') +
+        '</div>';
+      }
+      html += '<div class="bubble-actions">' +
+        '<div class="bubble-time">' + ago(c.at) + '</div>' +
+        '<button class="cmt-reply-btn" onclick="setChatReply(\'' + iid + '\',\'' + cmtKey + '\')">&#8617; reply</button>' +
+        '<button class="rxn-add" style="font-size:11px;padding:1px 5px" onclick="toggleRxnPicker(\'' + pickerId + '\')">+</button>' +
+        (isMe ? '<button class="cmt-del-btn" style="opacity:.4" onclick="deleteComment(\'' + iid + '\',' + c.at + ')">&#10005;</button>' : '') +
+      '</div>' +
+      '<div class="rxn-picker hidden" id="' + pickerId + '">' +
+        RXN_EMOJIS.map(e => '<button class="rxn-opt" onclick="reactToComment(\'' + iid + '\',' + c.at + ',\'' + e + '\');toggleRxnPicker(\'' + pickerId + '\')">' + e + '</button>').join('') +
+      '</div>' +
+      '</div>';
     }
   }
+
   el.innerHTML = html;
   const inputBar = $('chat-input-bar');
   if (inputBar) inputBar.dataset.iid = latestAt ? String(latestAt) : '';
-  _chatIids.forEach(iid => loadComments(iid));
 }
 function toggleRoastMore(iid) {
   const more = $('chat-more-' + iid);
@@ -1311,12 +1367,23 @@ function toggleRoastMore(iid) {
   more.style.display = expanded ? 'none' : 'inline';
   btn.textContent = expanded ? '… more' : ' less';
 }
-async function loadFeed(){
+async function loadFeed(scrollAfter = false) {
   if (!pushReady()) return;
   try {
     const items = await j(workerUrl('/feed'));
-    const key = items.map(i => i.at).join(',');
-    if (key !== _feedItemsKey) { _feedItemsKey = key; renderChatFeed(items); }
+    const commentMap = {};
+    if (items.length) {
+      await Promise.all(items.slice(0, 40).map(async item => {
+        const iid = String(item.at);
+        try { commentMap[iid] = await j(workerUrl('/comments/' + iid)); } catch { commentMap[iid] = []; }
+      }));
+    }
+    const key = items.map(i => {
+      const iid = String(i.at);
+      return iid + ':' + (commentMap[iid] || []).map(c => c.at + (c.reactions ? Object.values(c.reactions).flat().length : 0)).join(',');
+    }).join('|');
+    if (key !== _feedItemsKey) { _feedItemsKey = key; renderChatFeed(items, commentMap); }
+    if (scrollAfter) setTimeout(() => { const f = $('chat-feed'); if (f) f.scrollTop = f.scrollHeight; }, 50);
     startFeedRefresh();
   } catch {}
 }
@@ -1445,7 +1512,7 @@ async function reactToComment(itemId, commentAt, emoji) {
     });
     if (r.status === 401) { showLogin('Session expired. Please sign in again.'); return; }
     if (!r.ok) return;
-    renderCommentList(itemId, await r.json());
+    _feedItemsKey = ''; loadFeed();
   } catch {}
 }
 async function deleteComment(itemId, commentAt) {
@@ -1454,7 +1521,7 @@ async function deleteComment(itemId, commentAt) {
     const r = await workerFetch('/comments/' + itemId + '/' + commentAt, { method: 'DELETE' });
     if (r.status === 401) { showLogin('Session expired. Please sign in again.'); return; }
     if (!r.ok) return;
-    renderCommentList(itemId, await r.json());
+    _feedItemsKey = ''; loadFeed();
   } catch {}
 }
 async function submitComment(itemId) {
@@ -2006,12 +2073,12 @@ function openChat(focusInput) {
   document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   $('page-chat').classList.remove('hidden');
-  if (!_feedItemsKey) loadFeed();
-  if (focusInput) {
-    setTimeout(() => { const ta = $('chat-cb'); if (ta) ta.focus(); }, 300);
+  if (!_feedItemsKey) {
+    loadFeed(true);
   } else {
-    setTimeout(() => { const f = $('chat-feed'); if (f) f.scrollTop = f.scrollHeight; }, 150);
+    setTimeout(() => { const f = $('chat-feed'); if (f) f.scrollTop = f.scrollHeight; }, 50);
   }
+  if (focusInput) setTimeout(() => { const ta = $('chat-cb'); if (ta) ta.focus(); }, 300);
 }
 function closeChat() {
   showTab(_prevTab || 'score');
@@ -2091,9 +2158,7 @@ async function submitChatComment() {
     bodyEl.value = ''; bodyEl.style.height = '';
     clearChatReply(); clearChatImage();
     sendEl.disabled = false; sendEl.innerHTML = SEND_ICON;
-    renderCommentList(iid, await r.json());
-    const cco = document.getElementById('chat-cco-' + iid);
-    if (cco) cco.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    _feedItemsKey = ''; loadFeed(true);
   } catch {
     alert('Could not post. Try again.');
     sendEl.disabled = false; sendEl.innerHTML = SEND_ICON;
@@ -2123,9 +2188,9 @@ async function submitNewMsg() {
       if (r.status === 401) showLogin('Session expired. Please sign in again.');
       else alert('Could not send. Try again.');
     } else {
-      renderCommentList(iid, await r.json());
       bodyEl.value = ''; bodyEl.style.height = '';
       closeNewMsg();
+      _feedItemsKey = ''; loadFeed(true);
     }
   } catch { alert('Could not send. Try again.'); }
   if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
