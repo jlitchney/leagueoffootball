@@ -134,6 +134,7 @@ button{cursor:pointer}
 .feed-item .fbody{font-size:14px;line-height:1.5;white-space:pre-line}
 .fbadge{display:inline-block;font:700 10px/1 var(--body);padding:2px 7px;border-radius:4px;letter-spacing:.4px;margin-bottom:3px}
 .fbadge-recap{background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+.fbadge-roast{background:rgba(234,88,12,.1);color:#9a3412}
 .fbadge-live{background:rgba(21,128,61,.12);color:var(--live)}
 .fbadge-trade{background:rgba(17,24,39,.07);color:var(--ink)}
 .fbadge-alert{background:rgba(234,179,8,.12);color:#92400E}
@@ -203,6 +204,7 @@ button{cursor:pointer}
 .bubble-rxns{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;padding:0 2px}
 /* roast card in chat */
 .chat-roast{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;margin:14px 0 4px}
+.chat-roast.roast-fire{background:rgba(251,146,60,.07);border-color:rgba(234,88,12,.22)}
 .chat-roast-title{font:600 14px/1.3 var(--body);margin:4px 0 6px}
 .chat-roast-body{font-size:14px;line-height:1.5;color:var(--ink);white-space:pre-line}
 .chat-roast-more{background:none;border:0;color:#007AFF;font:inherit;font-size:14px;cursor:pointer;padding:0;margin-left:4px}
@@ -1254,12 +1256,9 @@ function startFeedRefresh() {
 const chatBadge = t => {
   if (t === 'weekly_recap') return '<span class="fbadge fbadge-recap">RECAP</span>';
   if (t === 'season_final') return '<span class="fbadge fbadge-champ">CHAMPION</span>';
-  if (t === 'player_explosion') return '<span class="fbadge fbadge-live">EXPLOSION</span>';
-  if (t === 'starter_flopped') return '<span class="fbadge fbadge-live">FLOP</span>';
-  if (t === 'late_lead_change') return '<span class="fbadge fbadge-live">LEAD CHANGE</span>';
   if (t === 'trade_completed') return '<span class="fbadge fbadge-trade">TRADE</span>';
   if (t === 'starting_a_player_who_wont_play' || t === 'empty_starting_slot') return '<span class="fbadge fbadge-alert">LINEUP</span>';
-  return '<span class="fbadge fbadge-recap">THE LEAGUE</span>';
+  return '<span class="fbadge fbadge-roast">ROAST</span>';
 };
 function renderChatFeed(items, commentMap) {
   const el = $('chat-feed');
@@ -1305,7 +1304,8 @@ function renderChatFeed(items, commentMap) {
       const bodyHtml = isLong
         ? esc(body.slice(0, TRUNC)) + '<span id="chat-more-' + iid + '" style="display:none">' + esc(body.slice(TRUNC)) + '</span><button class="chat-roast-more" id="chat-morebtn-' + iid + '" onclick="toggleRoastMore(\'' + iid + '\')">… more</button>'
         : esc(body);
-      html += '<div class="chat-roast">' +
+      const isRecap = i.type === 'weekly_recap' || i.type === 'season_final';
+      html += '<div class="chat-roast' + (isRecap ? '' : ' roast-fire') + '">' +
         chatBadge(i.type) +
         '<div class="chat-roast-title">' + esc(i.title) + '</div>' +
         '<div class="chat-roast-body">' + bodyHtml + '</div>' +
@@ -1325,8 +1325,8 @@ function renderChatFeed(items, commentMap) {
         html += '<div class="chat-roast" style="margin:4px 0;padding:8px 12px"><div style="font-size:13px;color:var(--muted)"><b>Roaster:</b> ' + esc(c.body) + '</div></div>';
         continue;
       }
-      const showSender = !isMe && cName !== prevBubbleSender;
-      prevBubbleSender = isMe ? '' : cName;
+      const showSender = !isMe;
+      prevBubbleSender = cName;
       html += '<div class="msg-row ' + (isMe ? 'me' : 'them') + '">';
       if (showSender) html += '<div class="msg-sender">' + esc(cName) + '</div>';
       html += '<div class="bubble ' + (isMe ? 'bubble-me' : 'bubble-them') + '">';
