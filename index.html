@@ -1355,9 +1355,17 @@ function renderChatFeed(items, commentMap) {
     }
   }
 
+  // Preserve scroll position on refresh; stay at bottom if already there
+  const wasNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  const distFromBottom = el.scrollHeight - el.scrollTop;
   el.innerHTML = html;
   const inputBar = $('chat-input-bar');
   if (inputBar) inputBar.dataset.iid = latestAt ? String(latestAt) : '';
+  if (wasNearBottom) {
+    el.scrollTop = el.scrollHeight;
+  } else {
+    el.scrollTop = el.scrollHeight - distFromBottom;
+  }
 }
 function toggleRoastMore(iid) {
   const more = $('chat-more-' + iid);
@@ -1383,7 +1391,7 @@ async function loadFeed(scrollAfter = false) {
       return iid + ':' + (commentMap[iid] || []).map(c => c.at + (c.reactions ? Object.values(c.reactions).flat().length : 0)).join(',');
     }).join('|');
     if (key !== _feedItemsKey) { _feedItemsKey = key; renderChatFeed(items, commentMap); }
-    if (scrollAfter) setTimeout(() => { const f = $('chat-feed'); if (f) f.scrollTop = f.scrollHeight; }, 50);
+    if (scrollAfter) setTimeout(() => { const f = $('chat-feed'); if (f) f.scrollTop = f.scrollHeight; }, 200);
     startFeedRefresh();
   } catch {}
 }
@@ -2076,7 +2084,7 @@ function openChat(focusInput) {
   if (!_feedItemsKey) {
     loadFeed(true);
   } else {
-    setTimeout(() => { const f = $('chat-feed'); if (f) f.scrollTop = f.scrollHeight; }, 50);
+    setTimeout(() => { const f = $('chat-feed'); if (f) f.scrollTop = f.scrollHeight; }, 200);
   }
   if (focusInput) setTimeout(() => { const ta = $('chat-cb'); if (ta) ta.focus(); }, 300);
 }
